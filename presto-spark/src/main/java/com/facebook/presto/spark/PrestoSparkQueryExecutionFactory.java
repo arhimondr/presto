@@ -18,6 +18,7 @@ import com.facebook.presto.Session;
 import com.facebook.presto.block.BlockEncodingManager;
 import com.facebook.presto.event.QueryMonitor;
 import com.facebook.presto.execution.QueryIdGenerator;
+import com.facebook.presto.execution.QueryInfo;
 import com.facebook.presto.execution.QueryPreparer;
 import com.facebook.presto.execution.QueryPreparer.PreparedQuery;
 import com.facebook.presto.execution.buffer.PagesSerde;
@@ -47,7 +48,6 @@ import com.facebook.presto.transaction.TransactionId;
 import com.facebook.presto.transaction.TransactionInfo;
 import com.facebook.presto.transaction.TransactionManager;
 import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.slice.Slices;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaPairRDD;
@@ -194,31 +194,33 @@ public class PrestoSparkQueryExecutionFactory
         @Override
         public List<List<Object>> execute()
         {
-            List<Tuple2<Integer, byte[]>> collectedRdd = rdd.collect();
+            List<Tuple2<Integer, byte[]>> collectedRdd;
+            try {
+                collectedRdd = rdd.collect();
+                commit();
+            }
+            catch (RuntimeException executionFailure) {
+                try {
+                    rollback();
+                }
+                catch (RuntimeException rollbackFailure) {
+                    if (executionFailure != rollbackFailure) {
+                        executionFailure.addSuppressed(rollbackFailure);
+                    }
+                }
+                queryCompletedEvent(Optional.of(executionFailure));
+                throw executionFailure;
+            }
+
+            // successfully finished
+            queryCompletedEvent(Optional.empty());
+
             ConnectorSession connectorSession = session.toConnectorSession();
-            List<List<Object>> result = collectedRdd.stream()
+            return collectedRdd.stream()
                     .map(Tuple2::_2)
                     .map(this::deserializePage)
                     .flatMap(page -> getPageValues(connectorSession, page, outputTypes).stream())
                     .collect(toList());
-
-            List<byte[]> serializedTaskStats = taskStatsCollector.value();
-            List<TaskStats> taskStats = serializedTaskStats.stream()
-                    .map(taskStatsJsonCodec::fromJson)
-                    .collect(toImmutableList());
-
-            // TODO: implement query monitor
-            // queryMonitor.queryCompletedEvent();
-
-            // commit transaction
-            Optional<TransactionInfo> transaction = session.getTransactionId()
-                    .flatMap(transactionManager::getOptionalTransactionInfo);
-
-            checkState(transaction.isPresent(), "transaction is not present");
-            checkState(transaction.get().isAutoCommitContext(), "transaction doesn't have auto commit context enabled");
-            getFutureValue(transactionManager.asyncCommit(transaction.get().getTransactionId()));
-
-            return result;
         }
 
         public List<Type> getOutputTypes()
@@ -249,6 +251,42 @@ public class PrestoSparkQueryExecutionFactory
                 rows.add(columns.build());
             }
             return rows.build();
+        }
+
+        private void commit()
+        {
+            getFutureValue(transactionManager.asyncCommit(getTransactionInfo().getTransactionId()));
+        }
+
+        private void rollback()
+        {
+            getFutureValue(transactionManager.asyncAbort(getTransactionInfo().getTransactionId()));
+        }
+
+        private TransactionInfo getTransactionInfo()
+        {
+            Optional<TransactionInfo> transaction = session.getTransactionId()
+                    .flatMap(transactionManager::getOptionalTransactionInfo);
+            checkState(transaction.isPresent(), "transaction is not present");
+            checkState(transaction.get().isAutoCommitContext(), "transaction doesn't have auto commit context enabled");
+            return transaction.get();
+        }
+
+        private void queryCompletedEvent(Optional<Throwable> failure)
+        {
+            QueryInfo queryInfo = createQueryInfo(failure);
+            // TODO: implement query monitor
+            // queryMonitor.queryCompletedEvent(queryInfo);
+        }
+
+        private QueryInfo createQueryInfo(Optional<Throwable> failure)
+        {
+            List<byte[]> serializedTaskStats = taskStatsCollector.value();
+            List<TaskStats> taskStats = serializedTaskStats.stream()
+                    .map(taskStatsJsonCodec::fromJson)
+                    .collect(toImmutableList());
+            // TODO:
+            return null;
         }
     }
 }
