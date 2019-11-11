@@ -249,7 +249,7 @@ public class SparkQueryRunner
                 .map(result -> new MaterializedRow(DEFAULT_PRECISION, result))
                 .collect(toImmutableList());
 
-        if (queryExecution.getUpdateType() == null) {
+        if (!queryExecution.getUpdateType().isPresent()) {
             return new MaterializedResult(rows, queryExecution.getOutputTypes());
         }
         else {
@@ -258,7 +258,7 @@ public class SparkQueryRunner
                     queryExecution.getOutputTypes(),
                     ImmutableMap.of(),
                     ImmutableSet.of(),
-                    Optional.ofNullable(queryExecution.getUpdateType()),
+                    queryExecution.getUpdateType(),
                     OptionalLong.of((Long) getOnlyElement(getOnlyElement(rows).getFields())),
                     ImmutableList.of());
         }
