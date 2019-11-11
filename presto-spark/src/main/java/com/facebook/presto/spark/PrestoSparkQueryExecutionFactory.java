@@ -56,7 +56,6 @@ import org.apache.spark.util.CollectionAccumulator;
 import scala.Some;
 import scala.Tuple2;
 
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 import java.util.List;
@@ -165,7 +164,7 @@ public class PrestoSparkQueryExecutionFactory
         private final CollectionAccumulator<byte[]> taskStatsCollector;
         private final JavaPairRDD<Integer, byte[]> rdd;
         private final List<Type> outputTypes;
-        private final String updateType;
+        private final Optional<String> updateType;
         private final PagesSerde pagesSerde;
         private final JsonCodec<TaskStats> taskStatsJsonCodec;
         private final TransactionManager transactionManager;
@@ -176,7 +175,7 @@ public class PrestoSparkQueryExecutionFactory
                 CollectionAccumulator<byte[]> taskStatsCollector,
                 JavaPairRDD<Integer, byte[]> rdd,
                 List<Type> outputTypes,
-                @Nullable String updateType,
+                Optional<String> updateType,
                 PagesSerde pagesSerde,
                 JsonCodec<TaskStats> taskStatsJsonCodec,
                 TransactionManager transactionManager)
@@ -227,7 +226,7 @@ public class PrestoSparkQueryExecutionFactory
             return outputTypes;
         }
 
-        public String getUpdateType()
+        public Optional<String> getUpdateType()
         {
             return updateType;
         }

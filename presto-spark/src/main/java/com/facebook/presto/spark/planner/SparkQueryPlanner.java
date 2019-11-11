@@ -29,7 +29,6 @@ import com.facebook.presto.sql.planner.LogicalPlanner;
 import com.facebook.presto.sql.planner.Plan;
 import com.facebook.presto.sql.planner.PlanOptimizers;
 
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 import java.util.Optional;
@@ -93,18 +92,18 @@ public class SparkQueryPlanner
         Analysis analysis = analyzer.analyze(preparedQuery.getStatement());
         return new PlanAndUpdateType(
                 logicalPlanner.plan(analysis, OPTIMIZED_AND_VALIDATED),
-                analysis.getUpdateType());
+                Optional.ofNullable(analysis.getUpdateType()));
     }
 
     public static class PlanAndUpdateType
     {
         private final Plan plan;
-        private final String updateType;
+        private final Optional<String> updateType;
 
-        public PlanAndUpdateType(Plan plan, @Nullable String updateType)
+        public PlanAndUpdateType(Plan plan, Optional<String> updateType)
         {
             this.plan = requireNonNull(plan, "plan is null");
-            this.updateType = updateType;
+            this.updateType = requireNonNull(updateType, "updateType is null");
         }
 
         public Plan getPlan()
@@ -112,7 +111,7 @@ public class SparkQueryPlanner
             return plan;
         }
 
-        public String getUpdateType()
+        public Optional<String> getUpdateType()
         {
             return updateType;
         }
