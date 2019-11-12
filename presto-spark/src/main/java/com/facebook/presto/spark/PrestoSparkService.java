@@ -13,36 +13,36 @@
  */
 package com.facebook.presto.spark;
 
-import com.facebook.presto.spark.execution.PrestoTaskCompiler;
-import com.facebook.presto.spark.spi.QueryExecutionFactory;
-import com.facebook.presto.spark.spi.Service;
-import com.facebook.presto.spark.spi.TaskCompiler;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkExecutionFactory;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkService;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskCompiler;
+import com.facebook.presto.spark.execution.PrestoSparkTaskCompiler;
 
 import javax.inject.Inject;
 
 import static java.util.Objects.requireNonNull;
 
 public class PrestoSparkService
-        implements Service
+        implements IPrestoSparkService
 {
-    private final PrestoSparkQueryExecutionFactory queryExecutionFactory;
-    private final PrestoTaskCompiler taskCompiler;
+    private final PrestoSparkExecutionFactory executionFactory;
+    private final PrestoSparkTaskCompiler taskCompiler;
 
     @Inject
-    public PrestoSparkService(PrestoSparkQueryExecutionFactory queryExecutionFactory, PrestoTaskCompiler taskCompiler)
+    public PrestoSparkService(PrestoSparkExecutionFactory executionFactory, PrestoSparkTaskCompiler taskCompiler)
     {
-        this.queryExecutionFactory = requireNonNull(queryExecutionFactory, "queryExecutionFactory is null");
+        this.executionFactory = requireNonNull(executionFactory, "executionFactory is null");
         this.taskCompiler = requireNonNull(taskCompiler, "taskCompiler is null");
     }
 
     @Override
-    public QueryExecutionFactory createQueryExecutionFactory()
+    public IPrestoSparkExecutionFactory createExecutionFactory()
     {
-        return queryExecutionFactory;
+        return executionFactory;
     }
 
     @Override
-    public TaskCompiler createTaskCompiler()
+    public IPrestoSparkTaskCompiler createTaskCompiler()
     {
         return taskCompiler;
     }

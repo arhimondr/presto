@@ -30,11 +30,11 @@ import com.facebook.presto.hive.metastore.file.FileHiveMetastore;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.QualifiedObjectName;
 import com.facebook.presto.server.PluginManager;
-import com.facebook.presto.spark.PrestoSparkQueryExecutionFactory.PrestoQueryExecution;
-import com.facebook.presto.spark.spi.QueryExecutionFactory;
-import com.facebook.presto.spark.spi.SessionInfo;
-import com.facebook.presto.spark.spi.TaskCompiler;
-import com.facebook.presto.spark.spi.TaskCompilerFactory;
+import com.facebook.presto.spark.PrestoSparkExecutionFactory.PrestoSparkExecution;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkExecutionFactory;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskCompiler;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskCompilerFactory;
+import com.facebook.presto.spark.classloader_interface.PrestoSparkSession;
 import com.facebook.presto.spi.Plugin;
 import com.facebook.presto.spi.security.PrincipalType;
 import com.facebook.presto.split.PageSourceManager;
@@ -238,35 +238,35 @@ public class SparkQueryRunner
     @Override
     public MaterializedResult execute(Session session, String sql)
     {
-        QueryExecutionFactory queryExecutionFactory = prestoSparkService.createQueryExecutionFactory();
-        PrestoQueryExecution queryExecution = (PrestoQueryExecution) queryExecutionFactory.create(
+        IPrestoSparkExecutionFactory executionFactory = prestoSparkService.createExecutionFactory();
+        PrestoSparkExecution execution = (PrestoSparkExecution) executionFactory.create(
                 sparkContext,
                 createSessionInfo(session),
                 sql,
-                new TestingCompilerFactory(instanceId));
-        List<List<Object>> results = queryExecution.execute();
+                new TestingPrestoSparkTaskCompilerFactory(instanceId));
+        List<List<Object>> results = execution.execute();
         List<MaterializedRow> rows = results.stream()
                 .map(result -> new MaterializedRow(DEFAULT_PRECISION, result))
                 .collect(toImmutableList());
 
-        if (!queryExecution.getUpdateType().isPresent()) {
-            return new MaterializedResult(rows, queryExecution.getOutputTypes());
+        if (!execution.getUpdateType().isPresent()) {
+            return new MaterializedResult(rows, execution.getOutputTypes());
         }
         else {
             return new MaterializedResult(
                     rows,
-                    queryExecution.getOutputTypes(),
+                    execution.getOutputTypes(),
                     ImmutableMap.of(),
                     ImmutableSet.of(),
-                    queryExecution.getUpdateType(),
+                    execution.getUpdateType(),
                     OptionalLong.of((Long) getOnlyElement(getOnlyElement(rows).getFields())),
                     ImmutableList.of());
         }
     }
 
-    private static SessionInfo createSessionInfo(Session session)
+    private static PrestoSparkSession createSessionInfo(Session session)
     {
-        return new SessionInfo(
+        return new PrestoSparkSession(
                 session.getIdentity().getUser(),
                 session.getIdentity().getPrincipal(),
                 session.getIdentity().getExtraCredentials(),
@@ -338,18 +338,18 @@ public class SparkQueryRunner
         }
     }
 
-    private static class TestingCompilerFactory
-            implements TaskCompilerFactory
+    private static class TestingPrestoSparkTaskCompilerFactory
+            implements IPrestoSparkTaskCompilerFactory
     {
         private final String instanceId;
 
-        private TestingCompilerFactory(String instanceId)
+        private TestingPrestoSparkTaskCompilerFactory(String instanceId)
         {
             this.instanceId = requireNonNull(instanceId, "instanceId is null");
         }
 
         @Override
-        public TaskCompiler create()
+        public IPrestoSparkTaskCompiler create()
         {
             return instances.get(instanceId).getPrestoSparkService().createTaskCompiler();
         }

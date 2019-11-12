@@ -11,12 +11,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.spark.spi;
+package com.facebook.presto.spark.classloader_interface;
 
 import java.io.Serializable;
 
-public interface TaskCompilerFactory
+public interface IPrestoSparkTaskCompilerFactory
         extends Serializable
 {
-    TaskCompiler create();
+    IPrestoSparkTaskCompiler create();
 }

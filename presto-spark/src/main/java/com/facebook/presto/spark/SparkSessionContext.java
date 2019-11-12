@@ -14,7 +14,7 @@
 package com.facebook.presto.spark;
 
 import com.facebook.presto.server.SessionContext;
-import com.facebook.presto.spark.spi.SessionInfo;
+import com.facebook.presto.spark.classloader_interface.PrestoSparkSession;
 import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.spi.session.ResourceEstimates;
 import com.facebook.presto.transaction.TransactionId;
@@ -44,25 +44,25 @@ public class SparkSessionContext
     private final Map<String, Map<String, String>> catalogSessionProperties;
     private final Optional<String> traceToken;
 
-    public static SparkSessionContext createFromSessionInfo(SessionInfo sessionInfo)
+    public static SparkSessionContext createFromSessionInfo(PrestoSparkSession prestoSparkSession)
     {
         return new SparkSessionContext(
                 new Identity(
-                        sessionInfo.getUser(),
-                        sessionInfo.getPrincipal(),
+                        prestoSparkSession.getUser(),
+                        prestoSparkSession.getPrincipal(),
                         // presto on spark does not support role management
                         ImmutableMap.of(),
-                        sessionInfo.getExtraCredentials()),
-                sessionInfo.getCatalog().orElse(null),
-                sessionInfo.getSchema().orElse(null),
-                sessionInfo.getSource().orElse(null),
-                sessionInfo.getClientInfo().orElse(null),
-                sessionInfo.getClientTags(),
-                sessionInfo.getTimeZoneId().orElse(null),
-                sessionInfo.getLanguage().orElse(null),
-                sessionInfo.getSystemProperties(),
-                sessionInfo.getCatalogSessionProperties(),
-                sessionInfo.getTraceToken());
+                        prestoSparkSession.getExtraCredentials()),
+                prestoSparkSession.getCatalog().orElse(null),
+                prestoSparkSession.getSchema().orElse(null),
+                prestoSparkSession.getSource().orElse(null),
+                prestoSparkSession.getClientInfo().orElse(null),
+                prestoSparkSession.getClientTags(),
+                prestoSparkSession.getTimeZoneId().orElse(null),
+                prestoSparkSession.getLanguage().orElse(null),
+                prestoSparkSession.getSystemProperties(),
+                prestoSparkSession.getCatalogSessionProperties(),
+                prestoSparkSession.getTraceToken());
     }
 
     public SparkSessionContext(

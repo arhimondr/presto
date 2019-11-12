@@ -145,7 +145,7 @@
         <module>presto-elasticsearch</module>
         <module>presto-sql-function</module>
         <module>presto-expressions</module>
-        <module>presto-spark-spi</module>
+        <module>presto-spark-classloader-interface</module>
         <module>presto-spark</module>
         <module>presto-spark-package</module>
         <module>presto-spark-launcher</module>
@@ -481,7 +481,7 @@
 
             <dependency>
                 <groupId>com.facebook.presto</groupId>
-                <artifactId>presto-spark-spi</artifactId>
+                <artifactId>presto-spark-classloader-interface</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

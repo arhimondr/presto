@@ -13,14 +13,14 @@
  */
 package com.facebook.presto.spark.launcher;
 
-import com.facebook.presto.spark.spi.Configuration;
-import com.facebook.presto.spark.spi.QueryExecution;
-import com.facebook.presto.spark.spi.QueryExecutionFactory;
-import com.facebook.presto.spark.spi.Service;
-import com.facebook.presto.spark.spi.ServiceFactory;
-import com.facebook.presto.spark.spi.SessionInfo;
-import com.facebook.presto.spark.spi.TaskCompiler;
-import com.facebook.presto.spark.spi.TaskCompilerFactory;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkExecution;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkExecutionFactory;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkService;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkServiceFactory;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskCompiler;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskCompilerFactory;
+import com.facebook.presto.spark.classloader_interface.PrestoSparkConfiguration;
+import com.facebook.presto.spark.classloader_interface.PrestoSparkSession;
 import com.google.common.base.Stopwatch;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -67,18 +67,18 @@ import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 @Command(name = "presto-spark-launcher", description = "Presto on Spark launcher")
-public class LauncherCommand
+public class PrestoSparkLauncherCommand
 {
-    private static final Logger log = Logger.getLogger(LauncherCommand.class.getName());
+    private static final Logger log = Logger.getLogger(PrestoSparkLauncherCommand.class.getName());
 
     @Inject
     public HelpOption helpOption;
 
     @Inject
-    public VersionOption versionOption = new VersionOption();
+    public PrestoSparkVersionOption versionOption = new PrestoSparkVersionOption();
 
     @Inject
-    public ClientOptions clientOptions = new ClientOptions();
+    public PrestoSparkClientOptions clientOptions = new PrestoSparkClientOptions();
 
     public void run()
     {
@@ -92,12 +92,12 @@ public class LauncherCommand
         distribution.deploy(sparkContext, tempDir);
 
         CachingServiceFactory serviceFactory = new CachingServiceFactory(distribution);
-        Service service = serviceFactory.createService();
-        QueryExecutionFactory executionFactory = service.createQueryExecutionFactory();
-        SessionInfo sessionInfo = createSessionInfo(clientOptions);
-        QueryExecution queryExecution = executionFactory.create(sparkContext, sessionInfo, query, new DistributionTaskCompilerFactory(serviceFactory));
+        IPrestoSparkService service = serviceFactory.createService();
+        IPrestoSparkExecutionFactory executionFactory = service.createExecutionFactory();
+        PrestoSparkSession session = createSessionInfo(clientOptions);
+        IPrestoSparkExecution execution = executionFactory.create(sparkContext, session, query, new DistributionPrestoSparkTaskCompilerFactory(serviceFactory));
 
-        List<List<Object>> results = queryExecution.execute();
+        List<List<Object>> results = execution.execute();
 
         System.out.println("Rows: " + results.size());
         results.forEach(System.out::println);
@@ -110,7 +110,7 @@ public class LauncherCommand
         }
     }
 
-    private static PrestoSparkDistribution createDistribution(ClientOptions clientOptions)
+    private static PrestoSparkDistribution createDistribution(PrestoSparkClientOptions clientOptions)
     {
         return new PrestoSparkDistribution(
                 new File(clientOptions.packagePath),
@@ -118,17 +118,17 @@ public class LauncherCommand
                 new File(clientOptions.catalogs));
     }
 
-    private static SparkContext createSparkContext(ClientOptions clientOptions)
+    private static SparkContext createSparkContext(PrestoSparkClientOptions clientOptions)
     {
         SparkConf sparkConfiguration = new SparkConf()
                 .setAppName("Presto");
         return new SparkContext(sparkConfiguration);
     }
 
-    private static SessionInfo createSessionInfo(ClientOptions clientOptions)
+    private static PrestoSparkSession createSessionInfo(PrestoSparkClientOptions clientOptions)
     {
         // TODO:
-        return new SessionInfo(
+        return new PrestoSparkSession(
                 "test",
                 Optional.empty(),
                 ImmutableMap.of(),
@@ -144,7 +144,7 @@ public class LauncherCommand
                 Optional.empty());
     }
 
-    private static ServiceFactory createServiceFactory(File directory)
+    private static IPrestoSparkServiceFactory createServiceFactory(File directory)
     {
         checkDirectory(directory);
         List<URL> urls = new ArrayList<>();
@@ -163,15 +163,15 @@ public class LauncherCommand
         PrestoSparkLoader prestoSparkLoader = new PrestoSparkLoader(
                 urls,
                 PrestoSparkLauncher.class.getClassLoader(),
-                asList("org.apache.spark.", "com.facebook.presto.spark.spi.", "scala."));
-        ServiceLoader<ServiceFactory> serviceLoader = ServiceLoader.load(ServiceFactory.class, prestoSparkLoader);
+                asList("org.apache.spark.", "com.facebook.presto.spark.classloader_interface.", "scala."));
+        ServiceLoader<IPrestoSparkServiceFactory> serviceLoader = ServiceLoader.load(IPrestoSparkServiceFactory.class, prestoSparkLoader);
         return serviceLoader.iterator().next();
     }
 
-    private static Configuration createConfiguration(PrestoSparkDistribution distribution)
+    private static PrestoSparkConfiguration createConfiguration(PrestoSparkDistribution distribution)
     {
         // TODO
-        return new Configuration(
+        return new PrestoSparkConfiguration(
                 distribution.getLocalConfigFile().getAbsolutePath(),
                 new File(distribution.getLocalPackageDirectory(), "plugin").getAbsolutePath(),
                 distribution.getLocalCatalogsDirectory().getAbsolutePath(),
@@ -301,7 +301,7 @@ public class LauncherCommand
     public static class CachingServiceFactory
             implements Serializable
     {
-        private static final Cache<String, Service> services = CacheBuilder.newBuilder().build();
+        private static final Cache<String, IPrestoSparkService> services = CacheBuilder.newBuilder().build();
 
         private final PrestoSparkDistribution distribution;
 
@@ -310,11 +310,11 @@ public class LauncherCommand
             this.distribution = requireNonNull(distribution, "distribution is null");
         }
 
-        public Service createService()
+        public IPrestoSparkService createService()
         {
             try {
                 return services.get(distribution.getFingerprint(), () -> {
-                    ServiceFactory serviceFactory = createServiceFactory(new File(distribution.getLocalPackageDirectory(), "lib"));
+                    IPrestoSparkServiceFactory serviceFactory = createServiceFactory(new File(distribution.getLocalPackageDirectory(), "lib"));
                     return serviceFactory.createService(createConfiguration(distribution));
                 });
             }
@@ -324,18 +324,18 @@ public class LauncherCommand
         }
     }
 
-    public static class DistributionTaskCompilerFactory
-            implements TaskCompilerFactory
+    public static class DistributionPrestoSparkTaskCompilerFactory
+            implements IPrestoSparkTaskCompilerFactory
     {
         private final CachingServiceFactory serviceFactory;
 
-        public DistributionTaskCompilerFactory(CachingServiceFactory serviceFactory)
+        public DistributionPrestoSparkTaskCompilerFactory(CachingServiceFactory serviceFactory)
         {
             this.serviceFactory = requireNonNull(serviceFactory, "serviceFactory is null");
         }
 
         @Override
-        public TaskCompiler create()
+        public IPrestoSparkTaskCompiler create()
         {
             return serviceFactory.createService().createTaskCompiler();
         }

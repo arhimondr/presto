@@ -14,9 +14,9 @@
 package com.facebook.presto.spark;
 
 import com.facebook.airlift.log.Logger;
-import com.facebook.presto.spark.spi.Configuration;
-import com.facebook.presto.spark.spi.Service;
-import com.facebook.presto.spark.spi.ServiceFactory;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkService;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkServiceFactory;
+import com.facebook.presto.spark.classloader_interface.PrestoSparkConfiguration;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.Injector;
@@ -27,12 +27,12 @@ import java.io.UncheckedIOException;
 import static com.facebook.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
 
 public class PrestoSparkServiceFactory
-        implements ServiceFactory
+        implements IPrestoSparkServiceFactory
 {
     private final Logger log = Logger.get(PrestoSparkServiceFactory.class);
 
     @Override
-    public Service createService(Configuration configuration)
+    public IPrestoSparkService createService(PrestoSparkConfiguration configuration)
     {
         ImmutableMap.Builder<String, String> properties = ImmutableMap.builder();
         try {

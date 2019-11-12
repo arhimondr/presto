@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.spark.spi;
+package com.facebook.presto.spark.classloader_interface;
 
 import java.security.Principal;
 import java.util.HashMap;
@@ -25,7 +25,10 @@ import static java.util.Collections.unmodifiableSet;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 
-public class SessionInfo
+/**
+ * Based on com.facebook.presto.Session
+ */
+public class PrestoSparkSession
 {
     private final String user;
     private final Optional<Principal> principal;
@@ -41,7 +44,7 @@ public class SessionInfo
     private final Map<String, Map<String, String>> catalogSessionProperties;
     private final Optional<String> traceToken;
 
-    public SessionInfo(
+    public PrestoSparkSession(
             String user,
             Optional<Principal> principal,
             Map<String, String> extraCredentials,

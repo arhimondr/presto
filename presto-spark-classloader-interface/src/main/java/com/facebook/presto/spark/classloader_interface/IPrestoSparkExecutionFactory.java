@@ -11,11 +11,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.spark.spi;
+package com.facebook.presto.spark.classloader_interface;
 
-public interface Service
+import org.apache.spark.SparkContext;
+
+public interface IPrestoSparkExecutionFactory
 {
-    QueryExecutionFactory createQueryExecutionFactory();
-
-    TaskCompiler createTaskCompiler();
+    IPrestoSparkExecution create(
+            SparkContext sparkContext,
+            PrestoSparkSession session,
+            String query,
+            IPrestoSparkTaskCompilerFactory taskCompilerFactory);
 }

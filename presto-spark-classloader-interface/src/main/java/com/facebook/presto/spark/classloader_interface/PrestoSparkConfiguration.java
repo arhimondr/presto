@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.spark.spi;
+package com.facebook.presto.spark.classloader_interface;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,14 +19,14 @@ import java.util.Map;
 import static java.util.Collections.unmodifiableMap;
 import static java.util.Objects.requireNonNull;
 
-public class Configuration
+public class PrestoSparkConfiguration
 {
     private final String configFilePath;
     private final String pluginsDirectoryPath;
     private final String pluginsConfigDirectoryPath;
     private final Map<String, String> extraProperties;
 
-    public Configuration(
+    public PrestoSparkConfiguration(
             String configFilePath,
             String pluginsDirectoryPath,
             String pluginsConfigDirectoryPath,

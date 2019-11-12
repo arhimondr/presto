@@ -20,7 +20,7 @@
     <dependencies>
         <dependency>
             <groupId>com.facebook.presto</groupId>
-            <artifactId>presto-spark-spi</artifactId>
+            <artifactId>presto-spark-classloader-interface</artifactId>
         </dependency>
 
         <dependency>

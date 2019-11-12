@@ -73,7 +73,7 @@ import com.facebook.presto.server.QuerySessionSupplier;
 import com.facebook.presto.server.ServerConfig;
 import com.facebook.presto.server.SessionPropertyDefaults;
 import com.facebook.presto.server.security.ServerSecurityModule;
-import com.facebook.presto.spark.execution.PrestoTaskCompiler;
+import com.facebook.presto.spark.execution.PrestoSparkTaskCompiler;
 import com.facebook.presto.spark.node.SparkInternalNodeManager;
 import com.facebook.presto.spark.node.SparkNodePartitioningManager;
 import com.facebook.presto.spark.planner.SparkPlanFragmenter;
@@ -360,8 +360,8 @@ public class PrestoSparkModule
         binder.bind(SparkPlanFragmenter.class).in(Scopes.SINGLETON);
         binder.bind(SparkPlanPreparer.class).in(Scopes.SINGLETON);
         binder.bind(SparkRddPlanner.class).in(Scopes.SINGLETON);
-        binder.bind(PrestoTaskCompiler.class).in(Scopes.SINGLETON);
-        binder.bind(PrestoSparkQueryExecutionFactory.class).in(Scopes.SINGLETON);
+        binder.bind(PrestoSparkTaskCompiler.class).in(Scopes.SINGLETON);
+        binder.bind(PrestoSparkExecutionFactory.class).in(Scopes.SINGLETON);
         binder.bind(PrestoSparkService.class).in(Scopes.SINGLETON);
     }
 

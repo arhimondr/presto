@@ -17,7 +17,7 @@ import io.airlift.airline.Option;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 
-public class VersionOption
+public class PrestoSparkVersionOption
 {
     @Option(name = "--version", description = "Display version information and exit")
     public Boolean version = false;
@@ -25,7 +25,7 @@ public class VersionOption
     public boolean showVersionIfRequested()
     {
         if (version) {
-            String clientVersion = LauncherCommand.class.getPackage().getImplementationVersion();
+            String clientVersion = PrestoSparkLauncherCommand.class.getPackage().getImplementationVersion();
             System.out.println(firstNonNull(clientVersion, "(version unknown)"));
         }
         return version;

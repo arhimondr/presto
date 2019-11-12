@@ -18,8 +18,8 @@ import com.facebook.presto.Session;
 import com.facebook.presto.execution.TaskSource;
 import com.facebook.presto.execution.scheduler.TableWriteInfo;
 import com.facebook.presto.spark.SparkTaskDescriptor;
-import com.facebook.presto.spark.spi.TaskCompilerFactory;
-import com.facebook.presto.spark.spi.TaskProcessors;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskCompilerFactory;
+import com.facebook.presto.spark.classloader_interface.TaskProcessors;
 import com.facebook.presto.spi.plan.PlanNodeId;
 import com.facebook.presto.sql.planner.PartitioningHandle;
 import com.facebook.presto.sql.planner.PlanFragment;
@@ -41,7 +41,7 @@ import java.util.Optional;
 import java.util.stream.IntStream;
 
 import static com.facebook.presto.SystemSessionProperties.getHashPartitionCount;
-import static com.facebook.presto.spark.spi.TaskProcessors.createTaskProcessor;
+import static com.facebook.presto.spark.classloader_interface.TaskProcessors.createTaskProcessor;
 import static com.facebook.presto.sql.planner.SystemPartitioningHandle.COORDINATOR_DISTRIBUTION;
 import static com.facebook.presto.sql.planner.SystemPartitioningHandle.FIXED_HASH_DISTRIBUTION;
 import static com.facebook.presto.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
@@ -65,14 +65,14 @@ public class SparkRddPlanner
             JavaSparkContext sparkContext,
             Session session,
             PreparedPlan preparedPlan,
-            TaskCompilerFactory compilerFactory,
+            IPrestoSparkTaskCompilerFactory taskCompilerFactory,
             CollectionAccumulator<byte[]> taskStatsCollector)
     {
         RddFactory rddFactory = new RddFactory(
                 session,
                 sparkTaskRequestJsonCodec,
                 sparkContext,
-                compilerFactory,
+                taskCompilerFactory,
                 getHashPartitionCount(session),
                 taskStatsCollector,
                 preparedPlan.getTableWriteInfo());
@@ -84,7 +84,7 @@ public class SparkRddPlanner
         private final Session session;
         private final JsonCodec<SparkTaskDescriptor> sparkTaskRequestJsonCodec;
         private final JavaSparkContext sparkContext;
-        private final TaskCompilerFactory compilerFactory;
+        private final IPrestoSparkTaskCompilerFactory compilerFactory;
         private final int hashPartitionCount;
         private final CollectionAccumulator<byte[]> taskStatsCollector;
         private final TableWriteInfo tableWriteInfo;
@@ -93,7 +93,7 @@ public class SparkRddPlanner
                 Session session,
                 JsonCodec<SparkTaskDescriptor> sparkTaskRequestJsonCodec,
                 JavaSparkContext sparkContext,
-                TaskCompilerFactory compilerFactory,
+                IPrestoSparkTaskCompilerFactory taskCompilerFactory,
                 int hashPartitionCount,
                 CollectionAccumulator<byte[]> taskStatsCollector,
                 TableWriteInfo tableWriteInfo)
@@ -101,7 +101,7 @@ public class SparkRddPlanner
             this.session = requireNonNull(session, "session is null");
             this.sparkTaskRequestJsonCodec = requireNonNull(sparkTaskRequestJsonCodec, "sparkTaskRequestJsonCodec is null");
             this.sparkContext = requireNonNull(sparkContext, "sparkContext is null");
-            this.compilerFactory = requireNonNull(compilerFactory, "compilerFactory is null");
+            this.compilerFactory = requireNonNull(taskCompilerFactory, "taskCompilerFactory is null");
             this.hashPartitionCount = hashPartitionCount;
             this.taskStatsCollector = requireNonNull(taskStatsCollector, "taskStatsCollector is null");
             this.tableWriteInfo = requireNonNull(tableWriteInfo, "tableWriteInfo is null");

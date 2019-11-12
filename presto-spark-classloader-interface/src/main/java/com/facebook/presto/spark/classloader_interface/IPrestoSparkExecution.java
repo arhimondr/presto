@@ -11,9 +11,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.spark.spi;
+package com.facebook.presto.spark.classloader_interface;
 
-public interface ServiceFactory
+import java.util.List;
+
+public interface IPrestoSparkExecution
 {
-    Service createService(Configuration configuration);
+    List<List<Object>> execute();
 }

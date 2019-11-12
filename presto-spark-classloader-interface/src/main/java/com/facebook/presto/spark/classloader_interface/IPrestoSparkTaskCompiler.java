@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.spark.spi;
+package com.facebook.presto.spark.classloader_interface;
 
 import org.apache.spark.util.CollectionAccumulator;
 import scala.Tuple2;
@@ -19,7 +19,7 @@ import scala.Tuple2;
 import java.util.Iterator;
 import java.util.Map;
 
-public interface TaskCompiler
+public interface IPrestoSparkTaskCompiler
 {
     Iterator<Tuple2<Integer, byte[]>> compile(
             int taskId,

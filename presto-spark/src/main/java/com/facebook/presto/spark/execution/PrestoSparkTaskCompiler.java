@@ -38,7 +38,7 @@ import com.facebook.presto.operator.TaskContext;
 import com.facebook.presto.operator.TaskExchangeClientManager;
 import com.facebook.presto.operator.TaskStats;
 import com.facebook.presto.spark.SparkTaskDescriptor;
-import com.facebook.presto.spark.spi.TaskCompiler;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskCompiler;
 import com.facebook.presto.spi.memory.MemoryPoolId;
 import com.facebook.presto.spi.plan.PlanNodeId;
 import com.facebook.presto.spiller.NodeSpillConfig;
@@ -78,10 +78,10 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.util.Objects.requireNonNull;
 
-public class PrestoTaskCompiler
-        implements TaskCompiler
+public class PrestoSparkTaskCompiler
+        implements IPrestoSparkTaskCompiler
 {
-    private static final Logger log = Logger.get(PrestoTaskCompiler.class);
+    private static final Logger log = Logger.get(PrestoSparkTaskCompiler.class);
 
     private final SessionPropertyManager sessionPropertyManager;
 
@@ -101,7 +101,7 @@ public class PrestoTaskCompiler
     private final boolean cpuTimerEnabled;
 
     @Inject
-    public PrestoTaskCompiler(
+    public PrestoSparkTaskCompiler(
             SessionPropertyManager sessionPropertyManager,
             JsonCodec<SparkTaskDescriptor> sparkTaskDescriptorJsonCodec,
             JsonCodec<TaskStats> taskStatsJsonCodec,
@@ -126,7 +126,7 @@ public class PrestoTaskCompiler
                 requireNonNull(taskManagerConfig, "taskManagerConfig is null").isTaskCpuTimerEnabled());
     }
 
-    public PrestoTaskCompiler(
+    public PrestoSparkTaskCompiler(
             SessionPropertyManager sessionPropertyManager,
             JsonCodec<SparkTaskDescriptor> sparkTaskDescriptorJsonCodec,
             JsonCodec<TaskStats> taskStatsJsonCodec,

@@ -32,9 +32,9 @@ public class PrestoSparkLauncher
 
     public static void main(String[] args)
     {
-        SingleCommand<LauncherCommand> command = singleCommand(LauncherCommand.class);
+        SingleCommand<PrestoSparkLauncherCommand> command = singleCommand(PrestoSparkLauncherCommand.class);
 
-        LauncherCommand console = parseNoValidate(command, args);
+        PrestoSparkLauncherCommand console = parseNoValidate(command, args);
         if (console.helpOption.showHelpIfRequested() ||
                 console.versionOption.showVersionIfRequested()) {
             exit(0);
@@ -61,13 +61,13 @@ public class PrestoSparkLauncher
         }
     }
 
-    private static LauncherCommand parseNoValidate(SingleCommand<LauncherCommand> command, String[] args)
+    private static PrestoSparkLauncherCommand parseNoValidate(SingleCommand<PrestoSparkLauncherCommand> command, String[] args)
     {
         CommandMetadata commandMetadata = command.getCommandMetadata();
         Parser parser = new Parser();
         ParseState state = parser.parseCommand(commandMetadata, ImmutableList.copyOf(args));
         return createInstance(
-                LauncherCommand.class,
+                PrestoSparkLauncherCommand.class,
                 commandMetadata.getAllOptions(),
                 state.getParsedOptions(),
                 commandMetadata.getArguments(),

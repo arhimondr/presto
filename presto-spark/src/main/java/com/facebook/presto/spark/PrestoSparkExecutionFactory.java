@@ -28,16 +28,16 @@ import com.facebook.presto.operator.TaskStats;
 import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.server.QuerySessionSupplier;
 import com.facebook.presto.server.SessionContext;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkExecution;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkExecutionFactory;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskCompilerFactory;
+import com.facebook.presto.spark.classloader_interface.PrestoSparkSession;
 import com.facebook.presto.spark.planner.PreparedPlan;
 import com.facebook.presto.spark.planner.SparkPlanFragmenter;
 import com.facebook.presto.spark.planner.SparkPlanPreparer;
 import com.facebook.presto.spark.planner.SparkQueryPlanner;
 import com.facebook.presto.spark.planner.SparkQueryPlanner.PlanAndUpdateType;
 import com.facebook.presto.spark.planner.SparkRddPlanner;
-import com.facebook.presto.spark.spi.QueryExecution;
-import com.facebook.presto.spark.spi.QueryExecutionFactory;
-import com.facebook.presto.spark.spi.SessionInfo;
-import com.facebook.presto.spark.spi.TaskCompilerFactory;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.QueryId;
@@ -69,8 +69,8 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
-public class PrestoSparkQueryExecutionFactory
-        implements QueryExecutionFactory
+public class PrestoSparkExecutionFactory
+        implements IPrestoSparkExecutionFactory
 {
     private final QueryIdGenerator queryIdGenerator;
     private final QuerySessionSupplier sessionSupplier;
@@ -86,7 +86,7 @@ public class PrestoSparkQueryExecutionFactory
     private final AccessControl accessControl;
 
     @Inject
-    public PrestoSparkQueryExecutionFactory(
+    public PrestoSparkExecutionFactory(
             QueryIdGenerator queryIdGenerator,
             QuerySessionSupplier sessionSupplier,
             QueryPreparer queryPreparer,
@@ -115,10 +115,10 @@ public class PrestoSparkQueryExecutionFactory
     }
 
     @Override
-    public QueryExecution create(SparkContext sparkContext, SessionInfo sessionInfo, String sql, TaskCompilerFactory compiler)
+    public IPrestoSparkExecution create(SparkContext sparkContext, PrestoSparkSession prestoSparkSession, String sql, IPrestoSparkTaskCompilerFactory taskCompilerFactory)
     {
         QueryId queryId = queryIdGenerator.createNextQueryId();
-        SessionContext sessionContext = SparkSessionContext.createFromSessionInfo(sessionInfo);
+        SessionContext sessionContext = SparkSessionContext.createFromSessionInfo(prestoSparkSession);
         TransactionId transactionId = transactionManager.beginTransaction(true);
         Session session = sessionSupplier.createSession(queryId, sessionContext)
                 .beginTransactionId(transactionId, transactionManager, accessControl);
@@ -141,10 +141,10 @@ public class PrestoSparkQueryExecutionFactory
                 javaSparkContext,
                 session,
                 preparedPlan,
-                compiler,
+                taskCompilerFactory,
                 taskStatsCollector);
 
-        return new PrestoQueryExecution(
+        return new PrestoSparkExecution(
                 session,
                 queryMonitor,
                 taskStatsCollector,
@@ -156,8 +156,8 @@ public class PrestoSparkQueryExecutionFactory
                 transactionManager);
     }
 
-    public static class PrestoQueryExecution
-            implements QueryExecution
+    public static class PrestoSparkExecution
+            implements IPrestoSparkExecution
     {
         private final Session session;
         private final QueryMonitor queryMonitor;
@@ -169,7 +169,7 @@ public class PrestoSparkQueryExecutionFactory
         private final JsonCodec<TaskStats> taskStatsJsonCodec;
         private final TransactionManager transactionManager;
 
-        private PrestoQueryExecution(
+        private PrestoSparkExecution(
                 Session session,
                 QueryMonitor queryMonitor,
                 CollectionAccumulator<byte[]> taskStatsCollector,

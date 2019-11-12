@@ -15,7 +15,7 @@ package com.facebook.presto.spark.launcher;
 
 import io.airlift.airline.Option;
 
-public class ClientOptions
+public class PrestoSparkClientOptions
 {
     @Option(name = {"-f", "--file"}, title = "file", description = "sql file to execute", required = true)
     public String file;
