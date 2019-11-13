@@ -32,7 +32,6 @@ import com.google.common.hash.Hashing;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.airlift.airline.Command;
 import io.airlift.airline.HelpOption;
-import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.SparkFiles;
 
@@ -80,13 +79,13 @@ public class PrestoSparkLauncherCommand
     @Inject
     public PrestoSparkClientOptions clientOptions = new PrestoSparkClientOptions();
 
-    public void run()
+    public void run(SparkContextFactory sparkContextFactory)
     {
         String query = readFileUtf8(checkFile(new File(clientOptions.file)));
 
         PrestoSparkDistribution distribution = createDistribution(clientOptions);
 
-        SparkContext sparkContext = createSparkContext(clientOptions);
+        SparkContext sparkContext = sparkContextFactory.create(clientOptions);
 
         File tempDir = createTempDir();
         distribution.deploy(sparkContext, tempDir);
@@ -116,13 +115,6 @@ public class PrestoSparkLauncherCommand
                 new File(clientOptions.packagePath),
                 new File(clientOptions.config),
                 new File(clientOptions.catalogs));
-    }
-
-    private static SparkContext createSparkContext(PrestoSparkClientOptions clientOptions)
-    {
-        SparkConf sparkConfiguration = new SparkConf()
-                .setAppName("Presto");
-        return new SparkContext(sparkConfiguration);
     }
 
     private static PrestoSparkSession createSessionInfo(PrestoSparkClientOptions clientOptions)

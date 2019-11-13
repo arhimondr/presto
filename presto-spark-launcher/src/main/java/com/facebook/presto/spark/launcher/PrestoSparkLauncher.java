@@ -13,16 +13,12 @@
  */
 package com.facebook.presto.spark.launcher;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import io.airlift.airline.DefaultCommandFactory;
 import io.airlift.airline.ParseException;
-import io.airlift.airline.ParseState;
-import io.airlift.airline.Parser;
 import io.airlift.airline.SingleCommand;
-import io.airlift.airline.model.CommandMetadata;
+import org.apache.spark.SparkConf;
+import org.apache.spark.SparkContext;
 
-import static io.airlift.airline.ParserUtil.createInstance;
+import static com.facebook.presto.spark.launcher.Commands.parseCommandNoValidate;
 import static io.airlift.airline.SingleCommand.singleCommand;
 import static java.lang.System.exit;
 
@@ -32,9 +28,18 @@ public class PrestoSparkLauncher
 
     public static void main(String[] args)
     {
+        runPrestoSpark(args, (clientOptions) -> {
+            SparkConf sparkConfiguration = new SparkConf()
+                    .setAppName("Presto");
+            return new SparkContext(sparkConfiguration);
+        });
+    }
+
+    public static void runPrestoSpark(String[] args, SparkContextFactory sparkContextFactory)
+    {
         SingleCommand<PrestoSparkLauncherCommand> command = singleCommand(PrestoSparkLauncherCommand.class);
 
-        PrestoSparkLauncherCommand console = parseNoValidate(command, args);
+        PrestoSparkLauncherCommand console = parseCommandNoValidate(command, args);
         if (console.helpOption.showHelpIfRequested() ||
                 console.versionOption.showVersionIfRequested()) {
             exit(0);
@@ -52,28 +57,12 @@ public class PrestoSparkLauncher
         }
 
         try {
-            console.run();
+            console.run(sparkContextFactory);
             exit(0);
         }
         catch (RuntimeException e) {
             e.printStackTrace();
             exit(1);
         }
-    }
-
-    private static PrestoSparkLauncherCommand parseNoValidate(SingleCommand<PrestoSparkLauncherCommand> command, String[] args)
-    {
-        CommandMetadata commandMetadata = command.getCommandMetadata();
-        Parser parser = new Parser();
-        ParseState state = parser.parseCommand(commandMetadata, ImmutableList.copyOf(args));
-        return createInstance(
-                PrestoSparkLauncherCommand.class,
-                commandMetadata.getAllOptions(),
-                state.getParsedOptions(),
-                commandMetadata.getArguments(),
-                state.getParsedArguments(),
-                commandMetadata.getMetadataInjections(),
-                ImmutableMap.of(CommandMetadata.class, commandMetadata),
-                new DefaultCommandFactory<>());
     }
 }
