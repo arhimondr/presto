@@ -248,16 +248,23 @@ public class PrestoSparkLauncherCommand
 
         public File getLocalPackageDirectory()
         {
-            return ensureDecompressed(getLocalFile(packageFile.getName()), new File(SparkFiles.getRootDirectory()));
+            File localPackageFile = packageFile.exists() ? packageFile : getLocalFile(packageFile.getName());
+            return ensureDecompressed(localPackageFile, new File(SparkFiles.getRootDirectory()));
         }
 
         public File getLocalConfigFile()
         {
+            if (config.exists()) {
+                return config;
+            }
             return getLocalFile(config.getName());
         }
 
         public File getLocalCatalogsDirectory()
         {
+            if (catalogs.exists()) {
+                return catalogs;
+            }
             return ensureDecompressed(getLocalFile(CATALOGS_ARCHIVE_NAME), new File(SparkFiles.getRootDirectory()));
         }
 

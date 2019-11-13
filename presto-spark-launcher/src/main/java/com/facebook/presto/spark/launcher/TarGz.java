@@ -60,6 +60,10 @@ public class TarGz
                     createDirectories(output.toPath());
                 }
                 else {
+                    File directory = output.getParentFile();
+                    if (!directory.exists()) {
+                        createDirectories(directory.toPath());
+                    }
                     try (OutputStream outputStream = new FileOutputStream(output)) {
                         ByteStreams.copy(archiveInputStream, outputStream);
                     }

@@ -14,6 +14,7 @@
 package com.facebook.presto.spark;
 
 import com.facebook.airlift.configuration.AbstractConfigurationAwareModule;
+import com.facebook.airlift.node.NodeConfig;
 import com.facebook.airlift.node.NodeInfo;
 import com.facebook.presto.GroupByHashPageIndexerFactory;
 import com.facebook.presto.PagesIndexPageSorter;
@@ -347,7 +348,8 @@ public class PrestoSparkModule
         binder.bind(ClusterMemoryPoolManager.class).toInstance(((poolId, listener) -> {}));
 
         // TODO: Decouple and remove: required by SessionPropertyDefaults, PluginManager, InternalResourceGroupManager, ConnectorManager
-        binder.bind(NodeInfo.class).toInstance(new NodeInfo("spark"));
+        configBinder(binder).bindConfig(NodeConfig.class);
+        binder.bind(NodeInfo.class).in(Scopes.SINGLETON);
 
         // TODO: Decouple and remove: required by LocalExecutionPlanner, PlanFragmenter
         binder.bind(NodePartitioningManager.class).to(SparkNodePartitioningManager.class).in(Scopes.SINGLETON);

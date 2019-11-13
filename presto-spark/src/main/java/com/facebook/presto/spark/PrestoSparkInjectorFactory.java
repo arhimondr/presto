@@ -30,6 +30,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -67,7 +68,11 @@ public class PrestoSparkInjectorFactory
         // Stream redirect doesn't work well with spark logging
         app.doNotInitializeLogging();
 
-        app.setRequiredConfigurationProperties(properties);
+        Map<String, String> requiredProperties = new HashMap<>();
+        requiredProperties.put("node.environment", "spark");
+        requiredProperties.putAll(properties);
+
+        app.setRequiredConfigurationProperties(ImmutableMap.copyOf(requiredProperties));
 
         Injector injector = app.strictConfig().initialize();
 
