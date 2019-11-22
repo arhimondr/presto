@@ -28,17 +28,15 @@ import com.facebook.presto.execution.buffer.SerializedPage;
 import com.facebook.presto.memory.MemoryPool;
 import com.facebook.presto.memory.NodeMemoryConfig;
 import com.facebook.presto.memory.QueryContext;
-import com.facebook.presto.memory.context.LocalMemoryContext;
 import com.facebook.presto.metadata.SessionPropertyManager;
 import com.facebook.presto.operator.Driver;
 import com.facebook.presto.operator.DriverContext;
 import com.facebook.presto.operator.DriverFactory;
-import com.facebook.presto.operator.ExchangeClient;
 import com.facebook.presto.operator.TaskContext;
-import com.facebook.presto.operator.TaskExchangeClientManager;
 import com.facebook.presto.operator.TaskStats;
 import com.facebook.presto.spark.SparkTaskDescriptor;
 import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskCompiler;
+import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.memory.MemoryPoolId;
 import com.facebook.presto.spi.plan.PlanNodeId;
 import com.facebook.presto.spiller.NodeSpillConfig;
@@ -46,7 +44,6 @@ import com.facebook.presto.spiller.SpillSpaceTracker;
 import com.facebook.presto.sql.planner.LocalExecutionPlanner;
 import com.facebook.presto.sql.planner.LocalExecutionPlanner.LocalExecutionPlan;
 import com.facebook.presto.sql.planner.PlanFragment;
-import com.facebook.presto.sql.planner.TypeProvider;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -92,6 +89,7 @@ public class PrestoSparkTaskCompiler
     private final ScheduledExecutorService yieldExecutor;
 
     private final LocalExecutionPlanner localExecutionPlanner;
+    private final BlockEncodingSerde blockEncodingSerde;
 
     private final DataSize maxUserMemory;
     private final DataSize maxTotalMemory;
@@ -108,6 +106,7 @@ public class PrestoSparkTaskCompiler
             Executor notificationExecutor,
             ScheduledExecutorService yieldExecutor,
             LocalExecutionPlanner localExecutionPlanner,
+            BlockEncodingSerde blockEncodingSerde,
             TaskManagerConfig taskManagerConfig,
             NodeMemoryConfig nodeMemoryConfig,
             NodeSpillConfig nodeSpillConfig)
@@ -119,6 +118,7 @@ public class PrestoSparkTaskCompiler
                 notificationExecutor,
                 yieldExecutor,
                 localExecutionPlanner,
+                blockEncodingSerde,
                 requireNonNull(nodeMemoryConfig, "nodeMemoryConfig is null").getMaxQueryMemoryPerNode(),
                 requireNonNull(nodeMemoryConfig, "nodeMemoryConfig is null").getMaxQueryTotalMemoryPerNode(),
                 requireNonNull(nodeSpillConfig, "nodeSpillConfig is null").getMaxSpillPerNode(),
@@ -133,6 +133,7 @@ public class PrestoSparkTaskCompiler
             Executor notificationExecutor,
             ScheduledExecutorService yieldExecutor,
             LocalExecutionPlanner localExecutionPlanner,
+            BlockEncodingSerde blockEncodingSerde,
             DataSize maxUserMemory,
             DataSize maxTotalMemory,
             DataSize maxSpillMemory,
@@ -145,6 +146,7 @@ public class PrestoSparkTaskCompiler
         this.notificationExecutor = requireNonNull(notificationExecutor, "notificationExecutor is null");
         this.yieldExecutor = requireNonNull(yieldExecutor, "yieldExecutor is null");
         this.localExecutionPlanner = requireNonNull(localExecutionPlanner, "localExecutionPlanner is null");
+        this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
         this.maxUserMemory = requireNonNull(maxUserMemory, "maxUserMemory is null");
         this.maxTotalMemory = requireNonNull(maxTotalMemory, "maxTotalMemory is null");
         this.maxSpillMemory = requireNonNull(maxSpillMemory, "maxSpillMemory is null");
@@ -197,14 +199,12 @@ public class PrestoSparkTaskCompiler
         LocalExecutionPlan localExecutionPlan = localExecutionPlanner.plan(
                 taskContext,
                 fragment.getRoot(),
-                TypeProvider.fromVariables(fragment.getVariables()),
                 fragment.getPartitioningScheme(),
                 fragment.getStageExecutionDescriptor(),
                 fragment.getTableScanSchedulingOrder(),
                 outputBuffer,
-                new SparkTaskExchangeClientManager(),
-                taskDescriptor.getTableWriteInfo(),
-                sparkInputs);
+                new SparkRemoteSourceFactory(sparkInputs, blockEncodingSerde),
+                taskDescriptor.getTableWriteInfo());
 
         List<Driver> drivers = createDrivers(
                 localExecutionPlan,
@@ -227,9 +227,11 @@ public class PrestoSparkTaskCompiler
         for (DriverFactory driverFactory : localExecutionPlan.getDriverFactories()) {
             for (int i = 0; i < driverFactory.getDriverInstances().orElse(1); i++) {
                 if (driverFactory.getSourceId().isPresent()) {
-                    checkState(driverFactoriesBySource.put(driverFactory.getSourceId().get(), driverFactory) == null);
                     boolean partitioned = tableScanSchedulingOrder.contains(driverFactory.getSourceId().get());
-                    if (!partitioned) {
+                    if (partitioned) {
+                        checkState(driverFactoriesBySource.put(driverFactory.getSourceId().get(), driverFactory) == null);
+                    }
+                    else {
                         DriverContext driverContext = taskContext.addPipelineContext(driverFactory.getPipelineId(), driverFactory.isInputDriver(), driverFactory.isOutputDriver(), false).addDriverContext();
                         Driver driver = driverFactory.createDriver(driverContext);
                         drivers.add(driver);
@@ -334,31 +336,5 @@ public class PrestoSparkTaskCompiler
     private static SerializedPage deserializeSerializedPage(byte[] data)
     {
         return readSerializedPages(Slices.wrappedBuffer(data).getInput()).next();
-    }
-
-    /**
-     * TODO: Remove this class once TaskExchangeClientManager is no longer required by the LocalExecutionPlanner
-     */
-    private static class SparkTaskExchangeClientManager
-            extends TaskExchangeClientManager
-    {
-        public SparkTaskExchangeClientManager()
-        {
-            super((context) -> {
-                throw new UnsupportedOperationException();
-            });
-        }
-
-        @Override
-        public synchronized ExchangeClient createExchangeClient(LocalMemoryContext systemMemoryContext)
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public synchronized List<ExchangeClient> getExchangeClients()
-        {
-            throw new UnsupportedOperationException();
-        }
     }
 }

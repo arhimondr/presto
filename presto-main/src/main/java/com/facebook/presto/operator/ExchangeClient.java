@@ -18,11 +18,8 @@ import com.facebook.presto.execution.TaskId;
 import com.facebook.presto.execution.buffer.PageCodecMarker;
 import com.facebook.presto.execution.buffer.SerializedPage;
 import com.facebook.presto.memory.context.LocalMemoryContext;
-import com.facebook.presto.metadata.Split;
 import com.facebook.presto.operator.HttpPageBufferClient.ClientCallback;
 import com.facebook.presto.operator.WorkProcessor.ProcessState;
-import com.facebook.presto.operator.exchange.ExchangeSource;
-import com.facebook.presto.split.RemoteSplit;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -49,7 +46,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static com.facebook.presto.operator.ExchangeOperator.REMOTE_CONNECTOR_ID;
 import static com.facebook.presto.spi.block.PageBuilderStatus.DEFAULT_MAX_PAGE_SIZE_IN_BYTES;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -76,7 +72,7 @@ import static java.util.Objects.requireNonNull;
  */
 @ThreadSafe
 public class ExchangeClient
-        implements Closeable, ExchangeSource
+        implements Closeable
 {
     private static final SerializedPage NO_MORE_PAGES = new SerializedPage(EMPTY_SLICE, PageCodecMarker.none(), 0, 0);
 
@@ -301,22 +297,6 @@ public class ExchangeClient
         }
         scheduleRequestIfNecessary();
         return page;
-    }
-
-    @Override
-    public void addSplit(Split split)
-    {
-        checkArgument(split.getConnectorId().equals(REMOTE_CONNECTOR_ID), "split is not a remote split");
-
-        RemoteSplit remoteSplit = (RemoteSplit) split.getConnectorSplit();
-
-        addLocation(remoteSplit.getLocation(), remoteSplit.getRemoteSourceTaskId());
-    }
-
-    @Override
-    public void noMoreSplits()
-    {
-        this.noMoreLocations();
     }
 
     public boolean isFinished()
