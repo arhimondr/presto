@@ -14,6 +14,7 @@
 package com.facebook.presto.spark;
 
 import com.facebook.airlift.json.JsonCodec;
+import com.facebook.airlift.log.Logger;
 import com.facebook.presto.Session;
 import com.facebook.presto.block.BlockEncodingManager;
 import com.facebook.presto.event.QueryMonitor;
@@ -24,30 +25,38 @@ import com.facebook.presto.execution.QueryPreparer.PreparedQuery;
 import com.facebook.presto.execution.buffer.PagesSerde;
 import com.facebook.presto.execution.buffer.PagesSerdeFactory;
 import com.facebook.presto.execution.warnings.WarningCollector;
+import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.operator.TaskStats;
 import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.server.QuerySessionSupplier;
 import com.facebook.presto.server.SessionContext;
-import com.facebook.presto.spark.classloader_interface.IPrestoSparkExecution;
-import com.facebook.presto.spark.classloader_interface.IPrestoSparkExecutionFactory;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkQueryExecution;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkQueryExecutionFactory;
 import com.facebook.presto.spark.classloader_interface.PrestoSparkSession;
-import com.facebook.presto.spark.classloader_interface.PrestoSparkTaskCompilerFactory;
-import com.facebook.presto.spark.planner.PreparedPlan;
-import com.facebook.presto.spark.planner.SparkPlanFragmenter;
-import com.facebook.presto.spark.planner.SparkPlanPreparer;
-import com.facebook.presto.spark.planner.SparkQueryPlanner;
-import com.facebook.presto.spark.planner.SparkQueryPlanner.PlanAndUpdateType;
-import com.facebook.presto.spark.planner.SparkRddPlanner;
+import com.facebook.presto.spark.classloader_interface.PrestoSparkTaskExecutorFactoryProvider;
+import com.facebook.presto.spark.classloader_interface.PrestoSparkTaskInputs;
+import com.facebook.presto.spark.classloader_interface.SerializedPrestoSparkPage;
+import com.facebook.presto.spark.classloader_interface.SerializedPrestoSparkTaskDescriptor;
+import com.facebook.presto.spark.classloader_interface.SerializedTaskStats;
+import com.facebook.presto.spark.planner.PrestoSparkPlan;
+import com.facebook.presto.spark.planner.PrestoSparkPlanFragmenter;
+import com.facebook.presto.spark.planner.PrestoSparkQueryPlanner;
+import com.facebook.presto.spark.planner.PrestoSparkQueryPlanner.PlanAndUpdateType;
+import com.facebook.presto.spark.planner.PrestoSparkRddFactory;
+import com.facebook.presto.spark.planner.PrestoSparkSplitEnumerator;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.sql.planner.PlanFragment;
 import com.facebook.presto.sql.planner.SubPlan;
+import com.facebook.presto.sql.planner.plan.RemoteSourceNode;
 import com.facebook.presto.transaction.TransactionId;
 import com.facebook.presto.transaction.TransactionInfo;
 import com.facebook.presto.transaction.TransactionManager;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import io.airlift.slice.Slices;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaPairRDD;
@@ -64,61 +73,75 @@ import java.util.Optional;
 import static com.facebook.airlift.concurrent.MoreFutures.getFutureValue;
 import static com.facebook.presto.SystemSessionProperties.isExchangeCompressionEnabled;
 import static com.facebook.presto.execution.buffer.PagesSerdeUtil.readSerializedPages;
+import static com.facebook.presto.sql.planner.planPrinter.PlanPrinter.textDistributedPlan;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.Iterables.getOnlyElement;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
-public class PrestoSparkExecutionFactory
-        implements IPrestoSparkExecutionFactory
+public class PrestoSparkQueryExecutionFactory
+        implements IPrestoSparkQueryExecutionFactory
 {
+    private static final Logger log = Logger.get(PrestoSparkQueryExecutionFactory.class);
+
     private final QueryIdGenerator queryIdGenerator;
     private final QuerySessionSupplier sessionSupplier;
     private final QueryPreparer queryPreparer;
-    private final SparkQueryPlanner queryPlanner;
-    private final SparkPlanFragmenter planFragmenter;
-    private final SparkPlanPreparer taskSourceResolver;
-    private final SparkRddPlanner rddPlanner;
+    private final PrestoSparkQueryPlanner queryPlanner;
+    private final PrestoSparkPlanFragmenter planFragmenter;
+    private final PrestoSparkSplitEnumerator splitEnumerator;
+    private final PrestoSparkRddFactory rddFactory;
     private final QueryMonitor queryMonitor;
     private final BlockEncodingManager blockEncodingManager;
     private final JsonCodec<TaskStats> taskStatsJsonCodec;
+    private final JsonCodec<PrestoSparkTaskDescriptor> sparkTaskDescriptorJsonCodec;
     private final TransactionManager transactionManager;
     private final AccessControl accessControl;
+    private final Metadata metadata;
 
     @Inject
-    public PrestoSparkExecutionFactory(
+    public PrestoSparkQueryExecutionFactory(
             QueryIdGenerator queryIdGenerator,
             QuerySessionSupplier sessionSupplier,
             QueryPreparer queryPreparer,
-            SparkQueryPlanner queryPlanner,
-            SparkPlanFragmenter planFragmenter,
-            SparkPlanPreparer taskSourceResolver,
-            SparkRddPlanner rddPlanner,
+            PrestoSparkQueryPlanner queryPlanner,
+            PrestoSparkPlanFragmenter planFragmenter,
+            PrestoSparkSplitEnumerator splitEnumerator,
+            PrestoSparkRddFactory rddFactory,
             QueryMonitor queryMonitor,
             BlockEncodingManager blockEncodingManager,
             JsonCodec<TaskStats> taskStatsJsonCodec,
+            JsonCodec<PrestoSparkTaskDescriptor> sparkTaskDescriptorJsonCodec,
             TransactionManager transactionManager,
-            AccessControl accessControl)
+            AccessControl accessControl,
+            Metadata metadata)
     {
         this.queryIdGenerator = requireNonNull(queryIdGenerator, "queryIdGenerator is null");
         this.sessionSupplier = requireNonNull(sessionSupplier, "sessionSupplier is null");
         this.queryPreparer = requireNonNull(queryPreparer, "queryPreparer is null");
         this.queryPlanner = requireNonNull(queryPlanner, "queryPlanner is null");
         this.planFragmenter = requireNonNull(planFragmenter, "planFragmenter is null");
-        this.taskSourceResolver = requireNonNull(taskSourceResolver, "taskSourceResolver is null");
-        this.rddPlanner = requireNonNull(rddPlanner, "rddPlanner is null");
+        this.splitEnumerator = requireNonNull(splitEnumerator, "splitEnumerator is null");
+        this.rddFactory = requireNonNull(rddFactory, "rddFactory is null");
         this.queryMonitor = requireNonNull(queryMonitor, "queryMonitor is null");
         this.blockEncodingManager = requireNonNull(blockEncodingManager, "pagesSerde is null");
         this.taskStatsJsonCodec = requireNonNull(taskStatsJsonCodec, "taskStatsJsonCodec is null");
+        this.sparkTaskDescriptorJsonCodec = requireNonNull(sparkTaskDescriptorJsonCodec, "sparkTaskDescriptorJsonCodec is null");
         this.transactionManager = requireNonNull(transactionManager, "transactionManager is null");
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
+        this.metadata = requireNonNull(metadata, "metadata is null");
     }
 
     @Override
-    public IPrestoSparkExecution create(SparkContext sparkContext, PrestoSparkSession prestoSparkSession, String sql, PrestoSparkTaskCompilerFactory taskCompilerFactory)
+    public IPrestoSparkQueryExecution create(
+            SparkContext sparkContext,
+            PrestoSparkSession prestoSparkSession,
+            String sql,
+            PrestoSparkTaskExecutorFactoryProvider executorFactoryProvider)
     {
         QueryId queryId = queryIdGenerator.createNextQueryId();
-        SessionContext sessionContext = SparkSessionContext.createFromSessionInfo(prestoSparkSession);
+        SessionContext sessionContext = PrestoSparkSessionContext.createFromSessionInfo(prestoSparkSession);
         TransactionId transactionId = transactionManager.beginTransaction(true);
         Session session = sessionSupplier.createSession(queryId, sessionContext)
                 .beginTransactionId(transactionId, transactionManager, accessControl);
@@ -132,71 +155,97 @@ public class PrestoSparkExecutionFactory
         PreparedQuery preparedQuery = queryPreparer.prepareQuery(session, sql, warningCollector);
         PlanAndUpdateType planAndUpdateType = queryPlanner.createQueryPlan(session, preparedQuery, warningCollector);
         SubPlan fragmentedPlan = planFragmenter.fragmentQueryPlan(session, planAndUpdateType.getPlan(), warningCollector);
-        PreparedPlan preparedPlan = taskSourceResolver.preparePlan(session, fragmentedPlan);
+        log.debug(textDistributedPlan(fragmentedPlan, metadata.getFunctionManager(), session, true));
+        PrestoSparkPlan prestoSparkPlan = splitEnumerator.preparePlan(session, fragmentedPlan);
 
         JavaSparkContext javaSparkContext = new JavaSparkContext(sparkContext);
-        CollectionAccumulator<byte[]> taskStatsCollector = new CollectionAccumulator<>();
+        CollectionAccumulator<SerializedTaskStats> taskStatsCollector = new CollectionAccumulator<>();
         taskStatsCollector.register(sparkContext, new Some<>("taskStatsCollector"), false);
-        JavaPairRDD<Integer, byte[]> rdd = rddPlanner.createSparkRdd(
+        JavaPairRDD<Integer, SerializedPrestoSparkPage> rdd = rddFactory.createSparkRdd(
                 javaSparkContext,
                 session,
-                preparedPlan,
-                taskCompilerFactory,
+                prestoSparkPlan,
+                executorFactoryProvider,
                 taskStatsCollector);
 
-        return new PrestoSparkExecution(
+        return new PrestoSparkQueryExecution(
                 session,
                 queryMonitor,
                 taskStatsCollector,
                 rdd,
-                fragmentedPlan.getFragment().getTypes(),
+                executorFactoryProvider,
+                prestoSparkPlan,
                 planAndUpdateType.getUpdateType(),
                 new PagesSerdeFactory(blockEncodingManager, isExchangeCompressionEnabled(session)).createPagesSerde(),
                 taskStatsJsonCodec,
+                sparkTaskDescriptorJsonCodec,
                 transactionManager);
     }
 
-    public static class PrestoSparkExecution
-            implements IPrestoSparkExecution
+    public static class PrestoSparkQueryExecution
+            implements IPrestoSparkQueryExecution
     {
         private final Session session;
         private final QueryMonitor queryMonitor;
-        private final CollectionAccumulator<byte[]> taskStatsCollector;
-        private final JavaPairRDD<Integer, byte[]> rdd;
-        private final List<Type> outputTypes;
+        private final CollectionAccumulator<SerializedTaskStats> taskStatsCollector;
+        private final JavaPairRDD<Integer, SerializedPrestoSparkPage> rdd;
+        private final PrestoSparkTaskExecutorFactoryProvider prestoSparkTaskExecutorFactoryProvider;
+        private final PrestoSparkPlan prestoSparkPlan;
         private final Optional<String> updateType;
         private final PagesSerde pagesSerde;
         private final JsonCodec<TaskStats> taskStatsJsonCodec;
+        private final JsonCodec<PrestoSparkTaskDescriptor> sparkTaskDescriptorJsonCodec;
+
         private final TransactionManager transactionManager;
 
-        private PrestoSparkExecution(
+        private PrestoSparkQueryExecution(
                 Session session,
                 QueryMonitor queryMonitor,
-                CollectionAccumulator<byte[]> taskStatsCollector,
-                JavaPairRDD<Integer, byte[]> rdd,
-                List<Type> outputTypes,
+                CollectionAccumulator<SerializedTaskStats> taskStatsCollector,
+                JavaPairRDD<Integer, SerializedPrestoSparkPage> rdd,
+                PrestoSparkTaskExecutorFactoryProvider prestoSparkTaskExecutorFactoryProvider,
+                PrestoSparkPlan prestoSparkPlan,
                 Optional<String> updateType,
                 PagesSerde pagesSerde,
                 JsonCodec<TaskStats> taskStatsJsonCodec,
+                JsonCodec<PrestoSparkTaskDescriptor> sparkTaskDescriptorJsonCodec,
                 TransactionManager transactionManager)
         {
             this.session = requireNonNull(session, "session is null");
             this.queryMonitor = requireNonNull(queryMonitor, "queryMonitor is null");
             this.taskStatsCollector = requireNonNull(taskStatsCollector, "taskStatsCollector is null");
             this.rdd = requireNonNull(rdd, "rdd is null");
-            this.outputTypes = ImmutableList.copyOf(requireNonNull(outputTypes, "outputTypes is null"));
+            this.prestoSparkTaskExecutorFactoryProvider = requireNonNull(prestoSparkTaskExecutorFactoryProvider, "prestoSparkExecutorFactoryProvider is null");
+            this.prestoSparkPlan = requireNonNull(prestoSparkPlan, "prestoSparkPlan is null");
             this.updateType = updateType;
             this.pagesSerde = requireNonNull(pagesSerde, "pagesSerde is null");
             this.taskStatsJsonCodec = requireNonNull(taskStatsJsonCodec, "taskStatsJsonCodec is null");
+            this.sparkTaskDescriptorJsonCodec = requireNonNull(sparkTaskDescriptorJsonCodec, "sparkTaskDescriptorJsonCodec is null");
             this.transactionManager = requireNonNull(transactionManager, "transactionManager is null");
         }
 
         @Override
         public List<List<Object>> execute()
         {
-            List<Tuple2<Integer, byte[]>> collectedRdd;
+            PlanFragment rootFragment = prestoSparkPlan.getPlan().getFragment();
+            RemoteSourceNode remoteSource = getOnlyElement(rootFragment.getRemoteSourceNodes());
+            PrestoSparkTaskDescriptor taskDescriptor = new PrestoSparkTaskDescriptor(
+                    session.toSessionRepresentation(),
+                    session.getIdentity().getExtraCredentials(),
+                    rootFragment,
+                    ImmutableList.of(),
+                    prestoSparkPlan.getTableWriteInfo());
+            SerializedPrestoSparkTaskDescriptor serializedTaskDescriptor = new SerializedPrestoSparkTaskDescriptor(sparkTaskDescriptorJsonCodec.toJsonBytes(taskDescriptor));
+
+            List<Tuple2<Integer, SerializedPrestoSparkPage>> resultRdd;
             try {
-                collectedRdd = rdd.collect();
+                List<Tuple2<Integer, SerializedPrestoSparkPage>> sparkDriverInput = rdd.collect();
+                resultRdd = ImmutableList.copyOf(prestoSparkTaskExecutorFactoryProvider.get().create(
+                        0,
+                        0,
+                        serializedTaskDescriptor,
+                        new PrestoSparkTaskInputs(ImmutableMap.of(remoteSource.getId().toString(), sparkDriverInput.iterator())),
+                        taskStatsCollector));
                 commit();
             }
             catch (RuntimeException executionFailure) {
@@ -216,16 +265,16 @@ public class PrestoSparkExecutionFactory
             queryCompletedEvent(Optional.empty());
 
             ConnectorSession connectorSession = session.toConnectorSession();
-            return collectedRdd.stream()
+            return resultRdd.stream()
                     .map(Tuple2::_2)
                     .map(this::deserializePage)
-                    .flatMap(page -> getPageValues(connectorSession, page, outputTypes).stream())
+                    .flatMap(page -> getPageValues(connectorSession, page, rootFragment.getTypes()).stream())
                     .collect(toList());
         }
 
         public List<Type> getOutputTypes()
         {
-            return outputTypes;
+            return prestoSparkPlan.getPlan().getFragment().getTypes();
         }
 
         public Optional<String> getUpdateType()
@@ -233,9 +282,9 @@ public class PrestoSparkExecutionFactory
             return updateType;
         }
 
-        private Page deserializePage(byte[] data)
+        private Page deserializePage(SerializedPrestoSparkPage page)
         {
-            return pagesSerde.deserialize(readSerializedPages(Slices.wrappedBuffer(data).getInput()).next());
+            return pagesSerde.deserialize(readSerializedPages(Slices.wrappedBuffer(page.getBytes()).getInput()).next());
         }
 
         private static List<List<Object>> getPageValues(ConnectorSession connectorSession, Page page, List<Type> types)
@@ -281,11 +330,12 @@ public class PrestoSparkExecutionFactory
 
         private QueryInfo createQueryInfo(Optional<Throwable> failure)
         {
-            List<byte[]> serializedTaskStats = taskStatsCollector.value();
+            List<SerializedTaskStats> serializedTaskStats = taskStatsCollector.value();
             List<TaskStats> taskStats = serializedTaskStats.stream()
+                    .map(SerializedTaskStats::getBytes)
                     .map(taskStatsJsonCodec::fromJson)
                     .collect(toImmutableList());
-            // TODO:
+            // TODO: create query info
             return null;
         }
     }

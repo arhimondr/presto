@@ -26,6 +26,7 @@ import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
+// Based on PluginClassLoader
 public class PrestoSparkLoader
         extends URLClassLoader
 {

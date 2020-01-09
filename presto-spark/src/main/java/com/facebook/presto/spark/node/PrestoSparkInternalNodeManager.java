@@ -25,7 +25,7 @@ import java.net.URI;
 import java.util.Set;
 import java.util.function.Consumer;
 
-public class SparkInternalNodeManager
+public class PrestoSparkInternalNodeManager
         implements InternalNodeManager
 {
     @Override
@@ -37,18 +37,18 @@ public class SparkInternalNodeManager
     @Override
     public Set<InternalNode> getActiveConnectorNodes(ConnectorId connectorId)
     {
-        // TODO: Just to make the Tpch connector happy, refactor
+        // TODO: Hack to make TPCH connector work
         return ImmutableSet.of(
-                new InternalNode("spark1", URI.create("http://127.0.0.1:1111"), NodeVersion.UNKNOWN, false),
-                new InternalNode("spark2", URI.create("http://127.0.0.2:1111"), NodeVersion.UNKNOWN, false),
-                new InternalNode("spark3", URI.create("http://127.0.0.3:1111"), NodeVersion.UNKNOWN, false),
-                new InternalNode("spark4", URI.create("http://127.0.0.4:1111"), NodeVersion.UNKNOWN, false));
+                new InternalNode("spark1", URI.create("http://127.0.0.1:60041"), NodeVersion.UNKNOWN, false),
+                new InternalNode("spark2", URI.create("http://127.0.0.1:60042"), NodeVersion.UNKNOWN, false),
+                new InternalNode("spark3", URI.create("http://127.0.0.1:60043"), NodeVersion.UNKNOWN, false),
+                new InternalNode("spark4", URI.create("http://127.0.0.1:60044"), NodeVersion.UNKNOWN, false));
     }
 
     @Override
     public InternalNode getCurrentNode()
     {
-        // TODO: Just to make the ConnectorManager#addCatalogConnector happy, refactor
+        // TODO: Hack to make TPCH connector work
         return new InternalNode("spark1", URI.create("http://127.0.0.1:1111"), NodeVersion.UNKNOWN, false);
     }
 

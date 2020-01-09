@@ -13,13 +13,9 @@
  */
 package com.facebook.presto.spark.classloader_interface;
 
-import org.apache.spark.SparkContext;
+import java.util.List;
 
-public interface IPrestoSparkExecutionFactory
+public interface IPrestoSparkQueryExecution
 {
-    IPrestoSparkExecution create(
-            SparkContext sparkContext,
-            PrestoSparkSession session,
-            String query,
-            PrestoSparkTaskCompilerFactory taskCompilerFactory);
+    List<List<Object>> execute();
 }

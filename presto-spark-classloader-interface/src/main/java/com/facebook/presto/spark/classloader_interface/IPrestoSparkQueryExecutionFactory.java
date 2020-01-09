@@ -13,9 +13,13 @@
  */
 package com.facebook.presto.spark.classloader_interface;
 
-public interface IPrestoSparkService
-{
-    IPrestoSparkQueryExecutionFactory getQueryExecutionFactory();
+import org.apache.spark.SparkContext;
 
-    IPrestoSparkTaskExecutorFactory getTaskExecutorFactory();
+public interface IPrestoSparkQueryExecutionFactory
+{
+    IPrestoSparkQueryExecution create(
+            SparkContext sparkContext,
+            PrestoSparkSession session,
+            String sql,
+            PrestoSparkTaskExecutorFactoryProvider executorFactoryProvider);
 }

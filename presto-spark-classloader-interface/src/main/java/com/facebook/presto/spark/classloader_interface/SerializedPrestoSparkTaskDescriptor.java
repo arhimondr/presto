@@ -11,30 +11,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.spark.planner;
+package com.facebook.presto.spark.classloader_interface;
 
-import com.facebook.presto.execution.scheduler.TableWriteInfo;
+import java.io.Serializable;
 
 import static java.util.Objects.requireNonNull;
 
-public class PreparedPlan
+public class SerializedPrestoSparkTaskDescriptor
+        implements Serializable
 {
-    private final SubPlanWithTaskSources plan;
-    private final TableWriteInfo tableWriteInfo;
+    private final byte[] bytes;
 
-    public PreparedPlan(SubPlanWithTaskSources plan, TableWriteInfo tableWriteInfo)
+    public SerializedPrestoSparkTaskDescriptor(byte[] bytes)
     {
-        this.plan = requireNonNull(plan, "plan is null");
-        this.tableWriteInfo = requireNonNull(tableWriteInfo, "tableWriteInfo is null");
+        this.bytes = requireNonNull(bytes, "bytes is null");
     }
 
-    public SubPlanWithTaskSources getPlan()
+    public byte[] getBytes()
     {
-        return plan;
-    }
-
-    public TableWriteInfo getTableWriteInfo()
-    {
-        return tableWriteInfo;
+        return bytes;
     }
 }

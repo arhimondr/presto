@@ -16,12 +16,12 @@ package com.facebook.presto.spark;
 import com.facebook.presto.tests.AbstractTestQueryFramework;
 import org.testng.annotations.Test;
 
-public class TestSparkQueryRunner
+public class TestPrestoSparkQueryRunner
         extends AbstractTestQueryFramework
 {
-    public TestSparkQueryRunner()
+    public TestPrestoSparkQueryRunner()
     {
-        super(() -> new SparkQueryRunner(4));
+        super(() -> new PrestoSparkQueryRunner(4));
     }
 
     @Test

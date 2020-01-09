@@ -74,13 +74,13 @@ import com.facebook.presto.server.QuerySessionSupplier;
 import com.facebook.presto.server.ServerConfig;
 import com.facebook.presto.server.SessionPropertyDefaults;
 import com.facebook.presto.server.security.ServerSecurityModule;
-import com.facebook.presto.spark.execution.PrestoSparkTaskCompiler;
-import com.facebook.presto.spark.node.SparkInternalNodeManager;
-import com.facebook.presto.spark.node.SparkNodePartitioningManager;
-import com.facebook.presto.spark.planner.SparkPlanFragmenter;
-import com.facebook.presto.spark.planner.SparkPlanPreparer;
-import com.facebook.presto.spark.planner.SparkQueryPlanner;
-import com.facebook.presto.spark.planner.SparkRddPlanner;
+import com.facebook.presto.spark.execution.PrestoSparkTaskExecutorFactory;
+import com.facebook.presto.spark.node.PrestoSparkInternalNodeManager;
+import com.facebook.presto.spark.node.PrestoSparkNodePartitioningManager;
+import com.facebook.presto.spark.planner.PrestoSparkPlanFragmenter;
+import com.facebook.presto.spark.planner.PrestoSparkQueryPlanner;
+import com.facebook.presto.spark.planner.PrestoSparkRddFactory;
+import com.facebook.presto.spark.planner.PrestoSparkSplitEnumerator;
 import com.facebook.presto.spi.PageIndexerFactory;
 import com.facebook.presto.spi.PageSorter;
 import com.facebook.presto.spi.block.Block;
@@ -179,11 +179,12 @@ public class PrestoSparkModule
         configBinder(binder).bindConfig(CompilerConfig.class);
         configBinder(binder).bindConfig(SqlEnvironmentConfig.class);
         configBinder(binder).bindConfig(StaticFunctionNamespaceStoreConfig.class);
+        configBinder(binder).bindConfig(PrestoSparkConfig.class);
 
         // json codecs
         jsonCodecBinder(binder).bindJsonCodec(ViewDefinition.class);
         jsonCodecBinder(binder).bindJsonCodec(TaskStats.class);
-        jsonCodecBinder(binder).bindJsonCodec(SparkTaskDescriptor.class);
+        jsonCodecBinder(binder).bindJsonCodec(PrestoSparkTaskDescriptor.class);
         jsonCodecBinder(binder).bindJsonCodec(TableCommitContext.class);
         jsonCodecBinder(binder).bindJsonCodec(ExplainAnalyzeContext.class);
         jsonCodecBinder(binder).bindJsonCodec(ExecutionFailureInfo.class);
@@ -209,8 +210,9 @@ public class PrestoSparkModule
         binder.bind(CatalogManager.class).in(Scopes.SINGLETON);
 
         // property managers
-        binder.bind(SessionPropertyManager.class).in(Scopes.SINGLETON);
+        binder.bind(SessionPropertyManager.class).toProvider(PrestoSparkSessionPropertyManagerProvider.class).in(Scopes.SINGLETON);
         binder.bind(SystemSessionProperties.class).in(Scopes.SINGLETON);
+        binder.bind(PrestoSparkSessionProperties.class).in(Scopes.SINGLETON);
         binder.bind(SessionPropertyDefaults.class).in(Scopes.SINGLETON);
         binder.bind(SchemaPropertyManager.class).in(Scopes.SINGLETON);
         binder.bind(TablePropertyManager.class).in(Scopes.SINGLETON);
@@ -338,7 +340,7 @@ public class PrestoSparkModule
         binder.bind(TaskCountEstimator.class).toInstance(new TaskCountEstimator(() -> 1000));
 
         // TODO: Decouple and remove: required by ConnectorManager
-        binder.bind(InternalNodeManager.class).toInstance(new SparkInternalNodeManager());
+        binder.bind(InternalNodeManager.class).toInstance(new PrestoSparkInternalNodeManager());
 
         // TODO: Decouple and remove: required by PluginManager
         binder.bind(InternalResourceGroupManager.class).in(Scopes.SINGLETON);
@@ -352,18 +354,18 @@ public class PrestoSparkModule
         binder.bind(NodeInfo.class).in(Scopes.SINGLETON);
 
         // TODO: Decouple and remove: required by LocalExecutionPlanner, PlanFragmenter
-        binder.bind(NodePartitioningManager.class).to(SparkNodePartitioningManager.class).in(Scopes.SINGLETON);
+        binder.bind(NodePartitioningManager.class).to(PrestoSparkNodePartitioningManager.class).in(Scopes.SINGLETON);
 
         // TODO: Decouple and remove: required by PluginManager
         install(new ServerSecurityModule());
 
         // spark specific
-        binder.bind(SparkQueryPlanner.class).in(Scopes.SINGLETON);
-        binder.bind(SparkPlanFragmenter.class).in(Scopes.SINGLETON);
-        binder.bind(SparkPlanPreparer.class).in(Scopes.SINGLETON);
-        binder.bind(SparkRddPlanner.class).in(Scopes.SINGLETON);
-        binder.bind(PrestoSparkTaskCompiler.class).in(Scopes.SINGLETON);
-        binder.bind(PrestoSparkExecutionFactory.class).in(Scopes.SINGLETON);
+        binder.bind(PrestoSparkQueryPlanner.class).in(Scopes.SINGLETON);
+        binder.bind(PrestoSparkPlanFragmenter.class).in(Scopes.SINGLETON);
+        binder.bind(PrestoSparkSplitEnumerator.class).in(Scopes.SINGLETON);
+        binder.bind(PrestoSparkRddFactory.class).in(Scopes.SINGLETON);
+        binder.bind(PrestoSparkTaskExecutorFactory.class).in(Scopes.SINGLETON);
+        binder.bind(PrestoSparkQueryExecutionFactory.class).in(Scopes.SINGLETON);
         binder.bind(PrestoSparkService.class).in(Scopes.SINGLETON);
     }
 

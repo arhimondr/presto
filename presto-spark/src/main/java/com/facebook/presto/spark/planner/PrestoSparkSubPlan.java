@@ -21,13 +21,14 @@ import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 
-public class SubPlanWithTaskSources
+public class PrestoSparkSubPlan
 {
     private final PlanFragment fragment;
+    // single TaskSource per table scan
     private final List<TaskSource> taskSources;
-    private final List<SubPlanWithTaskSources> children;
+    private final List<PrestoSparkSubPlan> children;
 
-    public SubPlanWithTaskSources(PlanFragment fragment, List<TaskSource> taskSources, List<SubPlanWithTaskSources> children)
+    public PrestoSparkSubPlan(PlanFragment fragment, List<TaskSource> taskSources, List<PrestoSparkSubPlan> children)
     {
         this.fragment = requireNonNull(fragment, "fragment is null");
         this.taskSources = ImmutableList.copyOf(requireNonNull(taskSources, "taskSources is null"));
@@ -44,7 +45,7 @@ public class SubPlanWithTaskSources
         return taskSources;
     }
 
-    public List<SubPlanWithTaskSources> getChildren()
+    public List<PrestoSparkSubPlan> getChildren()
     {
         return children;
     }

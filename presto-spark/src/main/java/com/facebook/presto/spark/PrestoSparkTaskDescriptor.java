@@ -27,7 +27,7 @@ import java.util.Map;
 
 import static java.util.Objects.requireNonNull;
 
-public class SparkTaskDescriptor
+public class PrestoSparkTaskDescriptor
 {
     private final SessionRepresentation session;
     private final Map<String, String> extraCredentials;
@@ -36,7 +36,7 @@ public class SparkTaskDescriptor
     private final TableWriteInfo tableWriteInfo;
 
     @JsonCreator
-    public SparkTaskDescriptor(
+    public PrestoSparkTaskDescriptor(
             @JsonProperty("session") SessionRepresentation session,
             @JsonProperty("extraCredentials") Map<String, String> extraCredentials,
             @JsonProperty("fragment") PlanFragment fragment,

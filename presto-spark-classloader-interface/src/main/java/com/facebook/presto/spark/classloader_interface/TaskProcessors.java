@@ -26,45 +26,81 @@ import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonMap;
 import static java.util.Collections.unmodifiableMap;
 
+// because of high number of template parameters inner classes are more readable then lambdas
+@SuppressWarnings("Convert2Lambda")
 public class TaskProcessors
 {
     private TaskProcessors() {}
 
-    public static PairFlatMapFunction<byte[], Integer, byte[]> createTaskProcessor(
-            PrestoSparkTaskCompilerFactory taskCompilerFactory,
-            CollectionAccumulator<byte[]> taskStatsCollector)
+    public static PairFlatMapFunction<Iterator<SerializedPrestoSparkTaskDescriptor>, Integer, SerializedPrestoSparkPage> createTaskProcessor(
+            PrestoSparkTaskExecutorFactoryProvider taskExecutorFactoryProvider,
+            CollectionAccumulator<SerializedTaskStats> taskStatsCollector)
     {
-        return (serializedTaskDescriptor) -> {
-            int taskId = TaskContext.get().partitionId();
-            return taskCompilerFactory.create().compile(taskId, serializedTaskDescriptor, emptyMap(), taskStatsCollector);
+        return new PairFlatMapFunction<Iterator<SerializedPrestoSparkTaskDescriptor>, Integer, SerializedPrestoSparkPage>()
+        {
+            @Override
+            public Iterator<Tuple2<Integer, SerializedPrestoSparkPage>> call(Iterator<SerializedPrestoSparkTaskDescriptor> serializedTaskRequestIterator)
+            {
+                SerializedPrestoSparkTaskDescriptor serializedTaskDescriptor = serializedTaskRequestIterator.next();
+                if (serializedTaskRequestIterator.hasNext()) {
+                    throw new IllegalArgumentException("each partition is expected to contain an exactly one task descriptor");
+                }
+                int partitionId = TaskContext.get().partitionId();
+                int attemptNumber = TaskContext.get().attemptNumber();
+                return taskExecutorFactoryProvider.get().create(partitionId, attemptNumber, serializedTaskDescriptor, new PrestoSparkTaskInputs(emptyMap()), taskStatsCollector);
+            }
         };
     }
 
-    public static PairFlatMapFunction<Iterator<Tuple2<Integer, byte[]>>, Integer, byte[]> createTaskProcessor(
-            PrestoSparkTaskCompilerFactory taskCompilerFactory,
-            byte[] serializedTaskDescriptor,
-            String inputId,
-            CollectionAccumulator<byte[]> taskStatsCollector)
+    public static PairFlatMapFunction<Iterator<Tuple2<Integer, SerializedPrestoSparkPage>>, Integer, SerializedPrestoSparkPage> createTaskProcessor(
+            PrestoSparkTaskExecutorFactoryProvider taskExecutorFactoryProvider,
+            SerializedPrestoSparkTaskDescriptor serializedTaskDescriptor,
+            String planNodeId,
+            CollectionAccumulator<SerializedTaskStats> taskStatsCollector)
     {
-        return (input) -> {
-            int taskId = TaskContext.get().partitionId();
-            return taskCompilerFactory.create().compile(taskId, serializedTaskDescriptor, singletonMap(inputId, input), taskStatsCollector);
+        return new PairFlatMapFunction<Iterator<Tuple2<Integer, SerializedPrestoSparkPage>>, Integer, SerializedPrestoSparkPage>()
+        {
+            @Override
+            public Iterator<Tuple2<Integer, SerializedPrestoSparkPage>> call(Iterator<Tuple2<Integer, SerializedPrestoSparkPage>> input)
+            {
+                int partitionId = TaskContext.get().partitionId();
+                int attemptNumber = TaskContext.get().attemptNumber();
+                return taskExecutorFactoryProvider.get().create(
+                        partitionId,
+                        attemptNumber,
+                        serializedTaskDescriptor,
+                        new PrestoSparkTaskInputs(singletonMap(planNodeId, input)),
+                        taskStatsCollector);
+            }
         };
     }
 
-    public static FlatMapFunction2<Iterator<Tuple2<Integer, byte[]>>, Iterator<Tuple2<Integer, byte[]>>, Tuple2<Integer, byte[]>> createTaskProcessor(
-            PrestoSparkTaskCompilerFactory taskCompilerFactory,
-            byte[] serializedTaskDescriptor,
-            String inputId1,
-            String inputId2,
-            CollectionAccumulator<byte[]> taskStatsCollector)
+    public static FlatMapFunction2<Iterator<Tuple2<Integer, SerializedPrestoSparkPage>>, Iterator<Tuple2<Integer, SerializedPrestoSparkPage>>, Tuple2<Integer, SerializedPrestoSparkPage>> createTaskProcessor(
+            PrestoSparkTaskExecutorFactoryProvider taskExecutorFactoryProvider,
+            SerializedPrestoSparkTaskDescriptor serializedTaskDescriptor,
+            String planNodeId1,
+            String planNodeId2,
+            CollectionAccumulator<SerializedTaskStats> taskStatsCollector)
     {
-        return (input1, input2) -> {
-            int taskId = TaskContext.get().partitionId();
-            HashMap<String, Iterator<Tuple2<Integer, byte[]>>> inputsMap = new HashMap<>();
-            inputsMap.put(inputId1, input1);
-            inputsMap.put(inputId2, input2);
-            return taskCompilerFactory.create().compile(taskId, serializedTaskDescriptor, unmodifiableMap(inputsMap), taskStatsCollector);
+        return new FlatMapFunction2<Iterator<Tuple2<Integer, SerializedPrestoSparkPage>>, Iterator<Tuple2<Integer, SerializedPrestoSparkPage>>, Tuple2<Integer, SerializedPrestoSparkPage>>()
+        {
+            @Override
+            public Iterator<Tuple2<Integer, SerializedPrestoSparkPage>> call(
+                    Iterator<Tuple2<Integer, SerializedPrestoSparkPage>> input1,
+                    Iterator<Tuple2<Integer, SerializedPrestoSparkPage>> input2)
+            {
+                int partitionId = TaskContext.get().partitionId();
+                int attemptNumber = TaskContext.get().attemptNumber();
+                HashMap<String, Iterator<Tuple2<Integer, SerializedPrestoSparkPage>>> inputsMap = new HashMap<>();
+                inputsMap.put(planNodeId1, input1);
+                inputsMap.put(planNodeId2, input2);
+                return taskExecutorFactoryProvider.get().create(
+                        partitionId,
+                        attemptNumber,
+                        serializedTaskDescriptor,
+                        new PrestoSparkTaskInputs(unmodifiableMap(inputsMap)),
+                        taskStatsCollector);
+            }
         };
     }
 }

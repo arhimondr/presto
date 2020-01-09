@@ -40,14 +40,14 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
-public class SparkOutputBuffer
+public class PrestoSparkOutputBuffer
         implements OutputBuffer
 {
     private static final ListenableFuture<?> NON_BLOCKED = immediateFuture(null);
 
     private final StateMachine<BufferState> state = new StateMachine<>("spark buffer", directExecutor(), NO_MORE_BUFFERS, TERMINAL_BUFFER_STATES);
 
-    private final Queue<PageWithPartition> bufferedPages = new ConcurrentLinkedQueue<>();
+    private final Queue<PageWithPartitionId> bufferedPages = new ConcurrentLinkedQueue<>();
 
     @Override
     public OutputBufferInfo getInfo()
@@ -82,7 +82,7 @@ public class SparkOutputBuffer
     public void enqueue(Lifespan lifespan, int partition, List<SerializedPage> pages)
     {
         checkState(state.get() == NO_MORE_BUFFERS, "unexpected state: %s", state.get());
-        pages.forEach(page -> bufferedPages.add(new PageWithPartition(page, partition)));
+        pages.forEach(page -> bufferedPages.add(new PageWithPartitionId(page, partition)));
     }
 
     @Override
@@ -96,9 +96,9 @@ public class SparkOutputBuffer
         return !bufferedPages.isEmpty();
     }
 
-    public PageWithPartition getNext()
+    public PageWithPartitionId getNext()
     {
-        PageWithPartition page = bufferedPages.poll();
+        PageWithPartitionId page = bufferedPages.poll();
         if (bufferedPages.isEmpty()) {
             state.setIf(FINISHED, state -> state == FLUSHING);
         }
@@ -186,6 +186,7 @@ public class SparkOutputBuffer
     @Override
     public boolean isOverutilized()
     {
+        // TODO: Improve this once multi threaded execution is enabled
         return false;
     }
 }

@@ -13,9 +13,10 @@
  */
 package com.facebook.presto.spark.classloader_interface;
 
-public interface IPrestoSparkService
-{
-    IPrestoSparkQueryExecutionFactory getQueryExecutionFactory();
+import java.io.Serializable;
 
-    IPrestoSparkTaskExecutorFactory getTaskExecutorFactory();
+public interface PrestoSparkTaskExecutorFactoryProvider
+        extends Serializable
+{
+    IPrestoSparkTaskExecutorFactory get();
 }

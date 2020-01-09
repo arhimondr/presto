@@ -11,30 +11,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.spark.execution;
+package com.facebook.presto.spark.classloader_interface;
 
-import com.facebook.presto.execution.buffer.SerializedPage;
+import org.apache.spark.util.CollectionAccumulator;
 
-import static java.util.Objects.requireNonNull;
-
-public class PageWithPartition
+public interface IPrestoSparkTaskExecutorFactory
 {
-    private final SerializedPage page;
-    private final int partition;
-
-    public PageWithPartition(SerializedPage page, int partition)
-    {
-        this.page = requireNonNull(page, "page is null");
-        this.partition = partition;
-    }
-
-    public SerializedPage getPage()
-    {
-        return page;
-    }
-
-    public int getPartition()
-    {
-        return partition;
-    }
+    IPrestoSparkTaskExecutor create(
+            int partitionId,
+            int attemptNumber,
+            SerializedPrestoSparkTaskDescriptor taskDescriptor,
+            PrestoSparkTaskInputs inputs,
+            CollectionAccumulator<SerializedTaskStats> taskStatsCollector);
 }

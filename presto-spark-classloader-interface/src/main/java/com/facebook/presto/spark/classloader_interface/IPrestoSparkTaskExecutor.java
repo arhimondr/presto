@@ -13,9 +13,11 @@
  */
 package com.facebook.presto.spark.classloader_interface;
 
-public interface IPrestoSparkService
-{
-    IPrestoSparkQueryExecutionFactory getQueryExecutionFactory();
+import scala.Tuple2;
 
-    IPrestoSparkTaskExecutorFactory getTaskExecutorFactory();
+import java.util.Iterator;
+
+public interface IPrestoSparkTaskExecutor
+        extends Iterator<Tuple2<Integer, SerializedPrestoSparkPage>>
+{
 }

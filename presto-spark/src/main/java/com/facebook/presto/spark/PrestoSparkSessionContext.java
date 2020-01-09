@@ -29,7 +29,7 @@ import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
-public class SparkSessionContext
+public class PrestoSparkSessionContext
         implements SessionContext
 {
     private final Identity identity;
@@ -44,9 +44,9 @@ public class SparkSessionContext
     private final Map<String, Map<String, String>> catalogSessionProperties;
     private final Optional<String> traceToken;
 
-    public static SparkSessionContext createFromSessionInfo(PrestoSparkSession prestoSparkSession)
+    public static PrestoSparkSessionContext createFromSessionInfo(PrestoSparkSession prestoSparkSession)
     {
-        return new SparkSessionContext(
+        return new PrestoSparkSessionContext(
                 new Identity(
                         prestoSparkSession.getUser(),
                         prestoSparkSession.getPrincipal(),
@@ -65,7 +65,7 @@ public class SparkSessionContext
                 prestoSparkSession.getTraceToken());
     }
 
-    public SparkSessionContext(
+    public PrestoSparkSessionContext(
             Identity identity,
             String catalog,
             String schema,

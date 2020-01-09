@@ -17,7 +17,7 @@ import com.facebook.presto.Session;
 import com.facebook.presto.execution.buffer.PagesSerdeFactory;
 import com.facebook.presto.execution.buffer.SerializedPage;
 import com.facebook.presto.operator.OperatorFactory;
-import com.facebook.presto.spark.execution.SparkRemoteSourceOperator.SparkRemoteSourceOperatorFactory;
+import com.facebook.presto.spark.execution.PrestoSparkRemoteSourceOperator.SparkRemoteSourceOperatorFactory;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.block.SortOrder;
 import com.facebook.presto.spi.plan.PlanNodeId;
@@ -33,13 +33,13 @@ import static com.facebook.presto.SystemSessionProperties.isExchangeCompressionE
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
-public class SparkRemoteSourceFactory
+public class PrestoSparkRemoteSourceFactory
         implements RemoteSourceFactory
 {
     private final Map<PlanNodeId, Iterator<SerializedPage>> inputs;
     private final BlockEncodingSerde blockEncodingSerde;
 
-    public SparkRemoteSourceFactory(Map<PlanNodeId, Iterator<SerializedPage>> inputs, BlockEncodingSerde blockEncodingSerde)
+    public PrestoSparkRemoteSourceFactory(Map<PlanNodeId, Iterator<SerializedPage>> inputs, BlockEncodingSerde blockEncodingSerde)
     {
         this.inputs = ImmutableMap.copyOf(requireNonNull(inputs, "inputs is null"));
         this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");

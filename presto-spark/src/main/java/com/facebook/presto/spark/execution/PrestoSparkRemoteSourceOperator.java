@@ -31,7 +31,7 @@ import java.util.function.Supplier;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
-public class SparkRemoteSourceOperator
+public class PrestoSparkRemoteSourceOperator
         implements SourceOperator
 {
     private final PlanNodeId sourceId;
@@ -41,7 +41,7 @@ public class SparkRemoteSourceOperator
 
     private boolean finished;
 
-    public SparkRemoteSourceOperator(PlanNodeId sourceId, OperatorContext operatorContext, Iterator<SerializedPage> iterator, PagesSerde serde)
+    public PrestoSparkRemoteSourceOperator(PlanNodeId sourceId, OperatorContext operatorContext, Iterator<SerializedPage> iterator, PagesSerde serde)
     {
         this.sourceId = requireNonNull(sourceId, "sourceId is null");
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
@@ -146,9 +146,9 @@ public class SparkRemoteSourceOperator
         public SourceOperator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "operator factory is closed");
-            return new SparkRemoteSourceOperator(
+            return new PrestoSparkRemoteSourceOperator(
                     planNodeId,
-                    driverContext.addOperatorContext(operatorId, planNodeId, SparkRemoteSourceOperator.class.getSimpleName()),
+                    driverContext.addOperatorContext(operatorId, planNodeId, PrestoSparkRemoteSourceOperator.class.getSimpleName()),
                     iterator,
                     serde);
         }

@@ -36,7 +36,7 @@ import java.util.Optional;
 import static com.facebook.presto.sql.planner.LogicalPlanner.Stage.OPTIMIZED_AND_VALIDATED;
 import static java.util.Objects.requireNonNull;
 
-public class SparkQueryPlanner
+public class PrestoSparkQueryPlanner
 {
     private final SqlParser sqlParser;
     private final PlanOptimizers optimizers;
@@ -47,7 +47,7 @@ public class SparkQueryPlanner
     private final AccessControl accessControl;
 
     @Inject
-    public SparkQueryPlanner(
+    public PrestoSparkQueryPlanner(
             SqlParser sqlParser,
             PlanOptimizers optimizers,
             QueryExplainer queryExplainer,

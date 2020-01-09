@@ -24,6 +24,7 @@ import com.facebook.presto.execution.TaskId;
 import com.facebook.presto.execution.TaskManagerConfig;
 import com.facebook.presto.execution.TaskSource;
 import com.facebook.presto.execution.TaskStateMachine;
+import com.facebook.presto.execution.buffer.PagesSerdeUtil;
 import com.facebook.presto.execution.buffer.SerializedPage;
 import com.facebook.presto.memory.MemoryPool;
 import com.facebook.presto.memory.NodeMemoryConfig;
@@ -34,8 +35,13 @@ import com.facebook.presto.operator.DriverContext;
 import com.facebook.presto.operator.DriverFactory;
 import com.facebook.presto.operator.TaskContext;
 import com.facebook.presto.operator.TaskStats;
-import com.facebook.presto.spark.SparkTaskDescriptor;
-import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskCompiler;
+import com.facebook.presto.spark.PrestoSparkTaskDescriptor;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskExecutor;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskExecutorFactory;
+import com.facebook.presto.spark.classloader_interface.PrestoSparkTaskInputs;
+import com.facebook.presto.spark.classloader_interface.SerializedPrestoSparkPage;
+import com.facebook.presto.spark.classloader_interface.SerializedPrestoSparkTaskDescriptor;
+import com.facebook.presto.spark.classloader_interface.SerializedTaskStats;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.memory.MemoryPoolId;
 import com.facebook.presto.spi.plan.PlanNodeId;
@@ -69,20 +75,18 @@ import java.util.OptionalInt;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 
-import static com.facebook.presto.execution.buffer.PagesSerdeUtil.readSerializedPages;
-import static com.facebook.presto.execution.buffer.PagesSerdeUtil.writeSerializedPage;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.util.Objects.requireNonNull;
 
-public class PrestoSparkTaskCompiler
-        implements IPrestoSparkTaskCompiler
+public class PrestoSparkTaskExecutorFactory
+        implements IPrestoSparkTaskExecutorFactory
 {
-    private static final Logger log = Logger.get(PrestoSparkTaskCompiler.class);
+    private static final Logger log = Logger.get(PrestoSparkTaskExecutorFactory.class);
 
     private final SessionPropertyManager sessionPropertyManager;
 
-    private final JsonCodec<SparkTaskDescriptor> sparkTaskDescriptorJsonCodec;
+    private final JsonCodec<PrestoSparkTaskDescriptor> taskDescriptorJsonCodec;
     private final JsonCodec<TaskStats> taskStatsJsonCodec;
 
     private final Executor notificationExecutor;
@@ -99,9 +103,9 @@ public class PrestoSparkTaskCompiler
     private final boolean cpuTimerEnabled;
 
     @Inject
-    public PrestoSparkTaskCompiler(
+    public PrestoSparkTaskExecutorFactory(
             SessionPropertyManager sessionPropertyManager,
-            JsonCodec<SparkTaskDescriptor> sparkTaskDescriptorJsonCodec,
+            JsonCodec<PrestoSparkTaskDescriptor> taskDescriptorJsonCodec,
             JsonCodec<TaskStats> taskStatsJsonCodec,
             Executor notificationExecutor,
             ScheduledExecutorService yieldExecutor,
@@ -113,7 +117,7 @@ public class PrestoSparkTaskCompiler
     {
         this(
                 sessionPropertyManager,
-                sparkTaskDescriptorJsonCodec,
+                taskDescriptorJsonCodec,
                 taskStatsJsonCodec,
                 notificationExecutor,
                 yieldExecutor,
@@ -126,9 +130,9 @@ public class PrestoSparkTaskCompiler
                 requireNonNull(taskManagerConfig, "taskManagerConfig is null").isTaskCpuTimerEnabled());
     }
 
-    public PrestoSparkTaskCompiler(
+    public PrestoSparkTaskExecutorFactory(
             SessionPropertyManager sessionPropertyManager,
-            JsonCodec<SparkTaskDescriptor> sparkTaskDescriptorJsonCodec,
+            JsonCodec<PrestoSparkTaskDescriptor> taskDescriptorJsonCodec,
             JsonCodec<TaskStats> taskStatsJsonCodec,
             Executor notificationExecutor,
             ScheduledExecutorService yieldExecutor,
@@ -141,7 +145,7 @@ public class PrestoSparkTaskCompiler
             boolean cpuTimerEnabled)
     {
         this.sessionPropertyManager = requireNonNull(sessionPropertyManager, "sessionPropertyManager is null");
-        this.sparkTaskDescriptorJsonCodec = requireNonNull(sparkTaskDescriptorJsonCodec, "sparkTaskDescriptorJsonCodec is null");
+        this.taskDescriptorJsonCodec = requireNonNull(taskDescriptorJsonCodec, "sparkTaskDescriptorJsonCodec is null");
         this.taskStatsJsonCodec = requireNonNull(taskStatsJsonCodec, "taskStatsJsonCodec is null");
         this.notificationExecutor = requireNonNull(notificationExecutor, "notificationExecutor is null");
         this.yieldExecutor = requireNonNull(yieldExecutor, "yieldExecutor is null");
@@ -155,18 +159,20 @@ public class PrestoSparkTaskCompiler
     }
 
     @Override
-    public Iterator<Tuple2<Integer, byte[]>> compile(
-            int sparkTaskId,
-            byte[] serializedTaskDescriptor,
-            Map<String, Iterator<Tuple2<Integer, byte[]>>> inputs,
-            CollectionAccumulator<byte[]> taskStatsCollector)
+    public IPrestoSparkTaskExecutor create(
+            int partitionId,
+            int attemptNumber,
+            SerializedPrestoSparkTaskDescriptor serializedTaskDescriptor,
+            PrestoSparkTaskInputs inputs,
+            CollectionAccumulator<SerializedTaskStats> taskStatsCollector)
     {
-        SparkTaskDescriptor taskDescriptor = sparkTaskDescriptorJsonCodec.fromJson(serializedTaskDescriptor);
+        PrestoSparkTaskDescriptor taskDescriptor = taskDescriptorJsonCodec.fromJson(serializedTaskDescriptor.getBytes());
 
         Session session = taskDescriptor.getSession().toSession(sessionPropertyManager, taskDescriptor.getExtraCredentials());
         PlanFragment fragment = taskDescriptor.getFragment();
         StageId stageId = new StageId(session.getQueryId(), fragment.getId().getId());
-        TaskId taskId = new TaskId(new StageExecutionId(stageId, 0), sparkTaskId);
+        // TODO: include attemptId in taskId
+        TaskId taskId = new TaskId(new StageExecutionId(stageId, 0), partitionId);
 
         MemoryPool memoryPool = new MemoryPool(new MemoryPoolId("spark-executor-memory-pool"), maxTotalMemory);
         SpillSpaceTracker spillSpaceTracker = new SpillSpaceTracker(maxSpillMemory);
@@ -190,11 +196,11 @@ public class PrestoSparkTaskCompiler
                 OptionalInt.empty(),
                 false);
 
-        SparkOutputBuffer outputBuffer = new SparkOutputBuffer();
-        ImmutableMap<PlanNodeId, Iterator<SerializedPage>> sparkInputs = inputs.entrySet().stream()
+        PrestoSparkOutputBuffer outputBuffer = new PrestoSparkOutputBuffer();
+        ImmutableMap<PlanNodeId, Iterator<SerializedPage>> sparkInputs = inputs.getInputsMap().entrySet().stream()
                 .collect(toImmutableMap(
                         entry -> new PlanNodeId(entry.getKey()),
-                        entry -> Iterators.transform(entry.getValue(), tuple -> deserializeSerializedPage(tuple._2))));
+                        entry -> Iterators.transform(entry.getValue(), tuple -> readSerializedPages(tuple._2))));
 
         LocalExecutionPlan localExecutionPlan = localExecutionPlanner.plan(
                 taskContext,
@@ -203,7 +209,7 @@ public class PrestoSparkTaskCompiler
                 fragment.getStageExecutionDescriptor(),
                 fragment.getTableScanSchedulingOrder(),
                 outputBuffer,
-                new SparkRemoteSourceFactory(sparkInputs, blockEncodingSerde),
+                new PrestoSparkRemoteSourceFactory(sparkInputs, blockEncodingSerde),
                 taskDescriptor.getTableWriteInfo());
 
         List<Driver> drivers = createDrivers(
@@ -212,7 +218,7 @@ public class PrestoSparkTaskCompiler
                 fragment.getTableScanSchedulingOrder(),
                 taskDescriptor.getSources());
 
-        return new SparkDriverProcessor(taskContext, drivers, outputBuffer, taskStatsJsonCodec, taskStatsCollector);
+        return new PrestoSparkTaskExecutor(taskContext, drivers, outputBuffer, taskStatsJsonCodec, taskStatsCollector);
     }
 
     public List<Driver> createDrivers(
@@ -221,7 +227,7 @@ public class PrestoSparkTaskCompiler
             List<PlanNodeId> tableScanSchedulingOrder,
             List<TaskSource> sources)
     {
-        // create drivers
+        // Based on LocalQueryRunner#createDrivers
         List<Driver> drivers = new ArrayList<>();
         Map<PlanNodeId, DriverFactory> driverFactoriesBySource = new HashMap<>();
         for (DriverFactory driverFactory : localExecutionPlan.getDriverFactories()) {
@@ -265,21 +271,22 @@ public class PrestoSparkTaskCompiler
         return ImmutableList.copyOf(drivers);
     }
 
-    private static class SparkDriverProcessor
-            extends AbstractIterator<Tuple2<Integer, byte[]>>
+    private static class PrestoSparkTaskExecutor
+            extends AbstractIterator<Tuple2<Integer, SerializedPrestoSparkPage>>
+            implements IPrestoSparkTaskExecutor
     {
         private final TaskContext taskContext;
         private final List<Driver> drivers;
-        private final SparkOutputBuffer outputBuffer;
+        private final PrestoSparkOutputBuffer outputBuffer;
         private final JsonCodec<TaskStats> taskStatsJsonCodec;
-        private final CollectionAccumulator<byte[]> taskStatsCollector;
+        private final CollectionAccumulator<SerializedTaskStats> taskStatsCollector;
 
-        private SparkDriverProcessor(
+        private PrestoSparkTaskExecutor(
                 TaskContext taskContext,
                 List<Driver> drivers,
-                SparkOutputBuffer outputBuffer,
+                PrestoSparkOutputBuffer outputBuffer,
                 JsonCodec<TaskStats> taskStatsJsonCodec,
-                CollectionAccumulator<byte[]> taskStatsCollector)
+                CollectionAccumulator<SerializedTaskStats> taskStatsCollector)
         {
             this.taskContext = requireNonNull(taskContext, "taskContext is null");
             this.drivers = ImmutableList.copyOf(requireNonNull(drivers, "drivers is null"));
@@ -289,7 +296,7 @@ public class PrestoSparkTaskCompiler
         }
 
         @Override
-        protected Tuple2<Integer, byte[]> computeNext()
+        protected Tuple2<Integer, SerializedPrestoSparkPage> computeNext()
         {
             boolean done = false;
             while (!done && !outputBuffer.hasPagesBuffered()) {
@@ -307,34 +314,34 @@ public class PrestoSparkTaskCompiler
             if (done && !outputBuffer.hasPagesBuffered()) {
                 TaskStats taskStats = taskContext.getTaskStats();
                 byte[] taskStatsSerialized = taskStatsJsonCodec.toJsonBytes(taskStats);
-                taskStatsCollector.add(taskStatsSerialized);
+                taskStatsCollector.add(new SerializedTaskStats(taskStatsSerialized));
                 return endOfData();
             }
 
-            PageWithPartition pageWithPartition = outputBuffer.getNext();
-            SerializedPage serializedPage = pageWithPartition.getPage();
+            PageWithPartitionId pageWithPartitionId = outputBuffer.getNext();
+            SerializedPage serializedPage = pageWithPartitionId.getPage();
 
-            log.debug("[%s] Producing page for partition: %s\n", taskContext.getTaskId(), pageWithPartition.getPartition());
+            log.debug("[%s] Producing page for partition: %s\n", taskContext.getTaskId(), pageWithPartitionId.getPartitionId());
 
-            return new Tuple2<>(pageWithPartition.getPartition(), serializePage(serializedPage));
+            return new Tuple2<>(pageWithPartitionId.getPartitionId(), writeSerializedPage(serializedPage));
         }
     }
 
-    private static byte[] serializePage(SerializedPage page)
+    private static SerializedPrestoSparkPage writeSerializedPage(SerializedPage page)
     {
         SliceOutput sliceOutput = new DynamicSliceOutput(page.getUncompressedSizeInBytes());
-        writeSerializedPage(sliceOutput, page);
+        PagesSerdeUtil.writeSerializedPage(sliceOutput, page);
         try {
             sliceOutput.close();
         }
         catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        return sliceOutput.getUnderlyingSlice().getBytes();
+        return new SerializedPrestoSparkPage(sliceOutput.getUnderlyingSlice().getBytes());
     }
 
-    private static SerializedPage deserializeSerializedPage(byte[] data)
+    private static SerializedPage readSerializedPages(SerializedPrestoSparkPage page)
     {
-        return readSerializedPages(Slices.wrappedBuffer(data).getInput()).next();
+        return PagesSerdeUtil.readSerializedPages(Slices.wrappedBuffer(page.getBytes()).getInput()).next();
     }
 }

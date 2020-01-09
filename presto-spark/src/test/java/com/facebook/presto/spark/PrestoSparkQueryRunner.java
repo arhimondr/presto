@@ -29,12 +29,13 @@ import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.file.FileHiveMetastore;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.QualifiedObjectName;
+import com.facebook.presto.metadata.SessionPropertyManager;
 import com.facebook.presto.server.PluginManager;
-import com.facebook.presto.spark.PrestoSparkExecutionFactory.PrestoSparkExecution;
-import com.facebook.presto.spark.classloader_interface.IPrestoSparkExecutionFactory;
-import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskCompiler;
+import com.facebook.presto.spark.PrestoSparkQueryExecutionFactory.PrestoSparkQueryExecution;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkQueryExecutionFactory;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskExecutorFactory;
 import com.facebook.presto.spark.classloader_interface.PrestoSparkSession;
-import com.facebook.presto.spark.classloader_interface.PrestoSparkTaskCompilerFactory;
+import com.facebook.presto.spark.classloader_interface.PrestoSparkTaskExecutorFactoryProvider;
 import com.facebook.presto.spi.Plugin;
 import com.facebook.presto.spi.security.PrincipalType;
 import com.facebook.presto.split.PageSourceManager;
@@ -75,10 +76,10 @@ import static java.nio.file.Files.createTempDirectory;
 import static java.util.Objects.requireNonNull;
 import static java.util.UUID.randomUUID;
 
-public class SparkQueryRunner
+public class PrestoSparkQueryRunner
         implements QueryRunner
 {
-    private static final Map<String, SparkQueryRunner> instances = new ConcurrentHashMap<>();
+    private static final Map<String, PrestoSparkQueryRunner> instances = new ConcurrentHashMap<>();
 
     private final Session defaultSession;
     private final int nodeCount;
@@ -100,14 +101,9 @@ public class SparkQueryRunner
 
     private final String instanceId;
 
-    public SparkQueryRunner(int nodeCount)
+    public PrestoSparkQueryRunner(int nodeCount)
     {
         this.nodeCount = nodeCount;
-
-        defaultSession = testSessionBuilder()
-                .setCatalog("tpch")
-                .setSchema("tiny")
-                .build();
 
         PrestoSparkInjectorFactory injectorFactory = new PrestoSparkInjectorFactory(
                 ImmutableMap.of(
@@ -117,6 +113,12 @@ public class SparkQueryRunner
                 ImmutableList.of());
 
         Injector injector = injectorFactory.create();
+
+        defaultSession = testSessionBuilder(injector.getInstance(SessionPropertyManager.class))
+                .setCatalog("tpch")
+                .setSchema("tiny")
+                .build();
+
         transactionManager = injector.getInstance(TransactionManager.class);
         metadata = injector.getInstance(Metadata.class);
         splitManager = injector.getInstance(SplitManager.class);
@@ -238,12 +240,12 @@ public class SparkQueryRunner
     @Override
     public MaterializedResult execute(Session session, String sql)
     {
-        IPrestoSparkExecutionFactory executionFactory = prestoSparkService.createExecutionFactory();
-        PrestoSparkExecution execution = (PrestoSparkExecution) executionFactory.create(
+        IPrestoSparkQueryExecutionFactory executionFactory = prestoSparkService.getQueryExecutionFactory();
+        PrestoSparkQueryExecution execution = (PrestoSparkQueryExecution) executionFactory.create(
                 sparkContext,
                 createSessionInfo(session),
                 sql,
-                new TestingPrestoSparkTaskCompilerFactory(instanceId));
+                new TestingPrestoSparkTaskExecutorFactoryProvider(instanceId));
         List<List<Object>> results = execution.execute();
         List<MaterializedRow> rows = results.stream()
                 .map(result -> new MaterializedRow(DEFAULT_PRECISION, result))
@@ -322,6 +324,7 @@ public class SparkQueryRunner
     public void close()
     {
         sparkContext.cancelAllJobs();
+        sparkContext.stop();
 
         try {
             if (lifeCycleManager != null) {
@@ -338,20 +341,20 @@ public class SparkQueryRunner
         }
     }
 
-    private static class TestingPrestoSparkTaskCompilerFactory
-            implements PrestoSparkTaskCompilerFactory
+    private static class TestingPrestoSparkTaskExecutorFactoryProvider
+            implements PrestoSparkTaskExecutorFactoryProvider
     {
         private final String instanceId;
 
-        private TestingPrestoSparkTaskCompilerFactory(String instanceId)
+        private TestingPrestoSparkTaskExecutorFactoryProvider(String instanceId)
         {
             this.instanceId = requireNonNull(instanceId, "instanceId is null");
         }
 
         @Override
-        public IPrestoSparkTaskCompiler create()
+        public IPrestoSparkTaskExecutorFactory get()
         {
-            return instances.get(instanceId).getPrestoSparkService().createTaskCompiler();
+            return instances.get(instanceId).getPrestoSparkService().getTaskExecutorFactory();
         }
     }
 

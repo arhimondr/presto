@@ -25,12 +25,12 @@ import javax.inject.Inject;
 
 import static java.util.Objects.requireNonNull;
 
-public class SparkPlanFragmenter
+public class PrestoSparkPlanFragmenter
 {
     private final PlanFragmenter planFragmenter;
 
     @Inject
-    public SparkPlanFragmenter(PlanFragmenter planFragmenter)
+    public PrestoSparkPlanFragmenter(PlanFragmenter planFragmenter)
     {
         this.planFragmenter = requireNonNull(planFragmenter, "planFragmenter is null");
     }

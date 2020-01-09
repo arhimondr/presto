@@ -13,9 +13,25 @@
  */
 package com.facebook.presto.spark.classloader_interface;
 
-import java.util.List;
+import scala.Tuple2;
 
-public interface IPrestoSparkExecution
+import java.util.Iterator;
+import java.util.Map;
+
+import static java.util.Objects.requireNonNull;
+
+public class PrestoSparkTaskInputs
 {
-    List<List<Object>> execute();
+    // planNodeId -> Iterator<[partitionId, page]>
+    private final Map<String, Iterator<Tuple2<Integer, SerializedPrestoSparkPage>>> inputsMap;
+
+    public PrestoSparkTaskInputs(Map<String, Iterator<Tuple2<Integer, SerializedPrestoSparkPage>>> inputsMap)
+    {
+        this.inputsMap = requireNonNull(inputsMap, "inputs is null");
+    }
+
+    public Map<String, Iterator<Tuple2<Integer, SerializedPrestoSparkPage>>> getInputsMap()
+    {
+        return inputsMap;
+    }
 }

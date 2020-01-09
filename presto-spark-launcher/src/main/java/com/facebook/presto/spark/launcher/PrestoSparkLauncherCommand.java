@@ -13,14 +13,14 @@
  */
 package com.facebook.presto.spark.launcher;
 
-import com.facebook.presto.spark.classloader_interface.IPrestoSparkExecution;
-import com.facebook.presto.spark.classloader_interface.IPrestoSparkExecutionFactory;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkQueryExecution;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkQueryExecutionFactory;
 import com.facebook.presto.spark.classloader_interface.IPrestoSparkService;
 import com.facebook.presto.spark.classloader_interface.IPrestoSparkServiceFactory;
-import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskCompiler;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskExecutorFactory;
 import com.facebook.presto.spark.classloader_interface.PrestoSparkConfiguration;
 import com.facebook.presto.spark.classloader_interface.PrestoSparkSession;
-import com.facebook.presto.spark.classloader_interface.PrestoSparkTaskCompilerFactory;
+import com.facebook.presto.spark.classloader_interface.PrestoSparkTaskExecutorFactoryProvider;
 import com.google.common.base.Stopwatch;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -92,11 +92,11 @@ public class PrestoSparkLauncherCommand
 
         CachingServiceFactory serviceFactory = new CachingServiceFactory(distribution);
         IPrestoSparkService service = serviceFactory.createService();
-        IPrestoSparkExecutionFactory executionFactory = service.createExecutionFactory();
+        IPrestoSparkQueryExecutionFactory queryExecutionFactory = service.getQueryExecutionFactory();
         PrestoSparkSession session = createSessionInfo(clientOptions);
-        IPrestoSparkExecution execution = executionFactory.create(sparkContext, session, query, new DistributionPrestoSparkTaskCompilerFactory(serviceFactory));
+        IPrestoSparkQueryExecution queryExecution = queryExecutionFactory.create(sparkContext, session, query, new DistributionBasedPrestoSparkTaskExecutorFactoryProvider(serviceFactory));
 
-        List<List<Object>> results = execution.execute();
+        List<List<Object>> results = queryExecution.execute();
 
         System.out.println("Rows: " + results.size());
         results.forEach(System.out::println);
@@ -119,7 +119,7 @@ public class PrestoSparkLauncherCommand
 
     private static PrestoSparkSession createSessionInfo(PrestoSparkClientOptions clientOptions)
     {
-        // TODO:
+        // TODO: add all important session parameters to client options
         return new PrestoSparkSession(
                 "test",
                 Optional.empty(),
@@ -323,20 +323,20 @@ public class PrestoSparkLauncherCommand
         }
     }
 
-    public static class DistributionPrestoSparkTaskCompilerFactory
-            implements PrestoSparkTaskCompilerFactory
+    public static class DistributionBasedPrestoSparkTaskExecutorFactoryProvider
+            implements PrestoSparkTaskExecutorFactoryProvider
     {
         private final CachingServiceFactory serviceFactory;
 
-        public DistributionPrestoSparkTaskCompilerFactory(CachingServiceFactory serviceFactory)
+        public DistributionBasedPrestoSparkTaskExecutorFactoryProvider(CachingServiceFactory serviceFactory)
         {
             this.serviceFactory = requireNonNull(serviceFactory, "serviceFactory is null");
         }
 
         @Override
-        public IPrestoSparkTaskCompiler create()
+        public IPrestoSparkTaskExecutorFactory get()
         {
-            return serviceFactory.createService().createTaskCompiler();
+            return serviceFactory.createService().getTaskExecutorFactory();
         }
     }
 }

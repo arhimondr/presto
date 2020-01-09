@@ -48,7 +48,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
-public class SparkPlanPreparer
+public class PrestoSparkSplitEnumerator
 {
     private static final int SPLIT_BATCH_SIZE = 1000;
 
@@ -56,23 +56,23 @@ public class SparkPlanPreparer
     private final Metadata metadata;
 
     @Inject
-    public SparkPlanPreparer(SplitManager splitManager, Metadata metadata)
+    public PrestoSparkSplitEnumerator(SplitManager splitManager, Metadata metadata)
     {
         this.splitManager = requireNonNull(splitManager, "splitManager is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
     }
 
-    public PreparedPlan preparePlan(Session session, SubPlan plan)
+    public PrestoSparkPlan preparePlan(Session session, SubPlan plan)
     {
         SqlQueryScheduler.StreamingPlanSection streamingPlanSection = extractStreamingSections(plan);
         checkState(streamingPlanSection.getChildren().isEmpty(), "expected no materialized exchanges");
         StreamingSubPlan streamingSubPlan = streamingPlanSection.getPlan();
-        return new PreparedPlan(resolveTaskSources(session, plan), createTableWriteInfo(streamingSubPlan, metadata, session));
+        return new PrestoSparkPlan(resolveTaskSources(session, plan), createTableWriteInfo(streamingSubPlan, metadata, session));
     }
 
-    private SubPlanWithTaskSources resolveTaskSources(Session session, SubPlan plan)
+    private PrestoSparkSubPlan resolveTaskSources(Session session, SubPlan plan)
     {
-        return new SubPlanWithTaskSources(
+        return new PrestoSparkSubPlan(
                 plan.getFragment(),
                 resolveTaskSources(session, plan.getFragment()),
                 plan.getChildren().stream()

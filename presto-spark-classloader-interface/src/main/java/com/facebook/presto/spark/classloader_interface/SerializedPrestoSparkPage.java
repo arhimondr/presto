@@ -13,17 +13,22 @@
  */
 package com.facebook.presto.spark.classloader_interface;
 
-import org.apache.spark.util.CollectionAccumulator;
-import scala.Tuple2;
+import java.io.Serializable;
 
-import java.util.Iterator;
-import java.util.Map;
+import static java.util.Objects.requireNonNull;
 
-public interface IPrestoSparkTaskCompiler
+public class SerializedPrestoSparkPage
+        implements Serializable
 {
-    Iterator<Tuple2<Integer, byte[]>> compile(
-            int taskId,
-            byte[] serializedTaskDescriptor,
-            Map<String, Iterator<Tuple2<Integer, byte[]>>> inputs,
-            CollectionAccumulator<byte[]> taskStatsCollector);
+    private final byte[] bytes;
+
+    public SerializedPrestoSparkPage(byte[] bytes)
+    {
+        this.bytes = requireNonNull(bytes, "bytes is null");
+    }
+
+    public byte[] getBytes()
+    {
+        return bytes;
+    }
 }

@@ -31,13 +31,13 @@ import java.util.List;
 /**
  * TODO: Decouple node and partition management in presto-main and remove this hack
  */
-public class SparkNodePartitioningManager
+public class PrestoSparkNodePartitioningManager
         extends NodePartitioningManager
 {
     @Inject
-    public SparkNodePartitioningManager(PartitioningProviderManager partitioningProviderManager)
+    public PrestoSparkNodePartitioningManager(PartitioningProviderManager partitioningProviderManager)
     {
-        super(new SparkNodeScheduler(), partitioningProviderManager);
+        super(new PrestoSparkNodeScheduler(), partitioningProviderManager);
     }
 
     @Override

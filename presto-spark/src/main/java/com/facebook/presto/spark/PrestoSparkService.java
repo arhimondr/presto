@@ -13,10 +13,10 @@
  */
 package com.facebook.presto.spark;
 
-import com.facebook.presto.spark.classloader_interface.IPrestoSparkExecutionFactory;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkQueryExecutionFactory;
 import com.facebook.presto.spark.classloader_interface.IPrestoSparkService;
-import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskCompiler;
-import com.facebook.presto.spark.execution.PrestoSparkTaskCompiler;
+import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskExecutorFactory;
+import com.facebook.presto.spark.execution.PrestoSparkTaskExecutorFactory;
 
 import javax.inject.Inject;
 
@@ -25,25 +25,25 @@ import static java.util.Objects.requireNonNull;
 public class PrestoSparkService
         implements IPrestoSparkService
 {
-    private final PrestoSparkExecutionFactory executionFactory;
-    private final PrestoSparkTaskCompiler taskCompiler;
+    private final PrestoSparkQueryExecutionFactory queryExecutionFactory;
+    private final PrestoSparkTaskExecutorFactory taskExecutorFactory;
 
     @Inject
-    public PrestoSparkService(PrestoSparkExecutionFactory executionFactory, PrestoSparkTaskCompiler taskCompiler)
+    public PrestoSparkService(PrestoSparkQueryExecutionFactory queryExecutionFactory, PrestoSparkTaskExecutorFactory taskExecutorFactory)
     {
-        this.executionFactory = requireNonNull(executionFactory, "executionFactory is null");
-        this.taskCompiler = requireNonNull(taskCompiler, "taskCompiler is null");
+        this.queryExecutionFactory = requireNonNull(queryExecutionFactory, "queryExecutionFactory is null");
+        this.taskExecutorFactory = requireNonNull(taskExecutorFactory, "taskExecutorFactory is null");
     }
 
     @Override
-    public IPrestoSparkExecutionFactory createExecutionFactory()
+    public IPrestoSparkQueryExecutionFactory getQueryExecutionFactory()
     {
-        return executionFactory;
+        return queryExecutionFactory;
     }
 
     @Override
-    public IPrestoSparkTaskCompiler createTaskCompiler()
+    public IPrestoSparkTaskExecutorFactory getTaskExecutorFactory()
     {
-        return taskCompiler;
+        return taskExecutorFactory;
     }
 }

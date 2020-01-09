@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.spark.node;
 
+import com.facebook.airlift.stats.CounterStat;
 import com.facebook.presto.execution.NodeTaskMap;
 import com.facebook.presto.execution.scheduler.LegacyNetworkTopology;
 import com.facebook.presto.execution.scheduler.NetworkLocationCache;
@@ -24,15 +25,17 @@ import com.facebook.presto.spi.ConnectorId;
 import com.facebook.presto.util.FinalizerService;
 import io.airlift.units.Duration;
 
+import java.util.Map;
+
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
  * TODO: Decouple node and partition management in presto-main and remove this hack
  */
-public class SparkNodeScheduler
+public class PrestoSparkNodeScheduler
         extends NodeScheduler
 {
-    public SparkNodeScheduler()
+    public PrestoSparkNodeScheduler()
     {
         super(
                 new NetworkLocationCache(new LegacyNetworkTopology()),
@@ -45,6 +48,24 @@ public class SparkNodeScheduler
 
     @Override
     public NodeSelector createNodeSelector(ConnectorId connectorId)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public NodeSelector createNodeSelector(ConnectorId connectorId, int maxTasksPerStage)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void stop()
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Map<String, CounterStat> getTopologicalSplitCounters()
     {
         throw new UnsupportedOperationException();
     }

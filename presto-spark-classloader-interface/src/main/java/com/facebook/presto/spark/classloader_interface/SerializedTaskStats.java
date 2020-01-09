@@ -15,8 +15,20 @@ package com.facebook.presto.spark.classloader_interface;
 
 import java.io.Serializable;
 
-public interface PrestoSparkTaskCompilerFactory
-        extends Serializable
+import static java.util.Objects.requireNonNull;
+
+public class SerializedTaskStats
+        implements Serializable
 {
-    IPrestoSparkTaskCompiler create();
+    private final byte[] bytes;
+
+    public SerializedTaskStats(byte[] bytes)
+    {
+        this.bytes = requireNonNull(bytes, "bytes is null");
+    }
+
+    public byte[] getBytes()
+    {
+        return bytes;
+    }
 }
