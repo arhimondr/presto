@@ -11,13 +11,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.hive.pagefile;
+package com.facebook.presto.common.io;
 
 import com.facebook.presto.common.io.DataOutput;
 import com.facebook.presto.common.io.SerializedPage;
 import io.airlift.slice.SliceOutput;
 
-import static com.facebook.presto.spi.page.PagesSerdeUtil.writeSerializedPage;
 import static io.airlift.slice.SizeOf.SIZE_OF_BYTE;
 import static io.airlift.slice.SizeOf.SIZE_OF_INT;
 import static java.util.Objects.requireNonNull;
@@ -25,22 +24,26 @@ import static java.util.Objects.requireNonNull;
 public class PageDataOutput
         implements DataOutput
 {
-    private final SerializedPage serializedPage;
+    private final SerializedPage page;
 
-    public PageDataOutput(SerializedPage serializedPage)
+    public PageDataOutput(SerializedPage page)
     {
-        this.serializedPage = requireNonNull(serializedPage, "serializedPage is null");
+        this.page = requireNonNull(page, "serializedPage is null");
     }
 
     @Override
     public long size()
     {
-        return SIZE_OF_INT * 3 + SIZE_OF_BYTE + serializedPage.getSizeInBytes();
+        return SIZE_OF_INT * 3 + SIZE_OF_BYTE + page.getSizeInBytes();
     }
 
     @Override
-    public void writeData(SliceOutput sliceOutput)
+    public void writeData(SliceOutput output)
     {
-        writeSerializedPage(sliceOutput, serializedPage);
+        output.writeInt(page.getPositionCount());
+        output.writeByte(page.getPageCodecMarkers());
+        output.writeInt(page.getUncompressedSizeInBytes());
+        output.writeInt(page.getSizeInBytes());
+        output.writeBytes(page.getSlice());
     }
 }

@@ -15,6 +15,7 @@ package com.facebook.presto.hive.pagefile;
 
 import com.facebook.presto.common.io.DataOutput;
 import com.facebook.presto.common.io.DataSink;
+import com.facebook.presto.common.io.PageDataOutput;
 import com.facebook.presto.common.io.SerializedPage;
 import com.facebook.presto.hive.HiveCompressionCodec;
 import com.google.common.collect.ImmutableList;
