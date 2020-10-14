@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.execution.buffer;
 
-import com.facebook.presto.spi.page.SerializedPage;
+import com.facebook.presto.common.io.SerializedPage;
 
 import javax.annotation.concurrent.ThreadSafe;
 

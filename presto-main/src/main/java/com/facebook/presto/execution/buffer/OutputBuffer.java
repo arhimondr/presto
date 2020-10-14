@@ -13,10 +13,10 @@
  */
 package com.facebook.presto.execution.buffer;
 
+import com.facebook.presto.common.io.SerializedPage;
 import com.facebook.presto.execution.Lifespan;
 import com.facebook.presto.execution.StateMachine.StateChangeListener;
 import com.facebook.presto.execution.buffer.OutputBuffers.OutputBufferId;
-import com.facebook.presto.spi.page.SerializedPage;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
 

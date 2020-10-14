@@ -15,6 +15,7 @@ package com.facebook.presto.orc;
 
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.common.Page;
+import com.facebook.presto.common.io.DataSink;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.orc.OrcWriteValidation.OrcWriteValidationBuilder;
 import com.facebook.presto.orc.OrcWriteValidation.OrcWriteValidationMode;
@@ -34,7 +35,7 @@ import com.facebook.presto.orc.metadata.StripeInformation;
 import com.facebook.presto.orc.metadata.statistics.ColumnStatistics;
 import com.facebook.presto.orc.metadata.statistics.StripeStatistics;
 import com.facebook.presto.orc.proto.DwrfProto;
-import com.facebook.presto.orc.stream.DataOutput;
+import com.facebook.presto.common.io.DataOutput;
 import com.facebook.presto.orc.stream.StreamDataOutput;
 import com.facebook.presto.orc.writer.ColumnWriter;
 import com.facebook.presto.orc.writer.SliceDictionaryColumnWriter;
@@ -77,7 +78,7 @@ import static com.facebook.presto.orc.metadata.ColumnEncoding.ColumnEncodingKind
 import static com.facebook.presto.orc.metadata.DwrfMetadataWriter.toFileStatistics;
 import static com.facebook.presto.orc.metadata.DwrfMetadataWriter.toStripeEncryptionGroup;
 import static com.facebook.presto.orc.metadata.PostScript.MAGIC;
-import static com.facebook.presto.orc.stream.DataOutput.createDataOutput;
+import static com.facebook.presto.common.io.DataOutput.createDataOutput;
 import static com.facebook.presto.orc.writer.ColumnWriters.createColumnWriter;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;

@@ -13,7 +13,8 @@
  */
 package com.facebook.presto.orc;
 
-import com.facebook.presto.orc.stream.DataOutput;
+import com.facebook.presto.common.io.DataOutput;
+import com.facebook.presto.common.io.DataSink;
 import io.airlift.slice.OutputStreamSliceOutput;
 import org.openjdk.jol.info.ClassLayout;
 

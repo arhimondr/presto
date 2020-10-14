@@ -14,11 +14,11 @@
 package com.facebook.presto.spark.util;
 
 import com.facebook.presto.block.BlockEncodingManager;
+import com.facebook.presto.common.io.SerializedPage;
 import com.facebook.presto.spark.classloader_interface.PrestoSparkSerializedPage;
 import com.facebook.presto.spi.page.PageCompressor;
 import com.facebook.presto.spi.page.PageDecompressor;
 import com.facebook.presto.spi.page.PagesSerde;
-import com.facebook.presto.spi.page.SerializedPage;
 import com.github.luben.zstd.Zstd;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;

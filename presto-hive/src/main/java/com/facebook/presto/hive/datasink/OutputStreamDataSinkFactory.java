@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.hive.datasink;
 
-import com.facebook.presto.orc.DataSink;
+import com.facebook.presto.common.io.DataSink;
 import com.facebook.presto.orc.OutputStreamDataSink;
 import com.facebook.presto.spi.ConnectorSession;
 import org.apache.hadoop.fs.FileSystem;

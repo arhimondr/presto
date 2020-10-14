@@ -15,11 +15,11 @@ package com.facebook.presto.spiller;
 
 import com.facebook.presto.common.Page;
 import com.facebook.presto.common.block.BlockBuilder;
+import com.facebook.presto.common.io.SerializedPage;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.execution.buffer.TestingPagesSerdeFactory;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.page.PagesSerde;
-import com.facebook.presto.spi.page.SerializedPage;
 import com.facebook.presto.spi.spiller.SpillCipher;
 import com.google.common.collect.ImmutableList;
 import org.testng.Assert.ThrowingRunnable;
@@ -28,10 +28,10 @@ import org.testng.annotations.Test;
 import java.util.List;
 import java.util.Optional;
 
+import static com.facebook.presto.common.io.PageCodecMarker.ENCRYPTED;
 import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.operator.PageAssertions.assertPageEquals;
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
-import static com.facebook.presto.spi.page.PageCodecMarker.ENCRYPTED;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;

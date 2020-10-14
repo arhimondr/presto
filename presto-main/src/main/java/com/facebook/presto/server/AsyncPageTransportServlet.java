@@ -15,12 +15,12 @@ package com.facebook.presto.server;
 
 import com.facebook.airlift.concurrent.BoundedExecutor;
 import com.facebook.airlift.log.Logger;
+import com.facebook.presto.common.io.SerializedPage;
 import com.facebook.presto.execution.TaskId;
 import com.facebook.presto.execution.TaskManager;
 import com.facebook.presto.execution.buffer.BufferResult;
 import com.facebook.presto.execution.buffer.OutputBuffers.OutputBufferId;
 import com.facebook.presto.operator.ExchangeClientConfig;
-import com.facebook.presto.spi.page.SerializedPage;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;

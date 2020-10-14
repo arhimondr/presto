@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.spark.execution;
 
-import com.facebook.presto.spi.page.SerializedPage;
+import com.facebook.presto.common.io.SerializedPage;
 import org.openjdk.jol.info.ClassLayout;
 
 import static java.util.Objects.requireNonNull;

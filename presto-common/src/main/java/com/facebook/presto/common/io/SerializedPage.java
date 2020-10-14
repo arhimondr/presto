@@ -11,15 +11,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.spi.page;
+package com.facebook.presto.common.io;
 
 import io.airlift.slice.Slice;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.util.Objects;
 
-import static com.facebook.presto.spi.page.PageCodecMarker.COMPRESSED;
-import static com.facebook.presto.spi.page.PageCodecMarker.ENCRYPTED;
+import static com.facebook.presto.common.io.PageCodecMarker.COMPRESSED;
+import static com.facebook.presto.common.io.PageCodecMarker.ENCRYPTED;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 

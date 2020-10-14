@@ -13,8 +13,8 @@
  */
 package com.facebook.presto.hive.pagefile;
 
-import com.facebook.presto.orc.stream.DataOutput;
-import com.facebook.presto.spi.page.SerializedPage;
+import com.facebook.presto.common.io.DataOutput;
+import com.facebook.presto.common.io.SerializedPage;
 import io.airlift.slice.SliceOutput;
 
 import static com.facebook.presto.spi.page.PagesSerdeUtil.writeSerializedPage;

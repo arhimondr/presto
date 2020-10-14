@@ -13,10 +13,11 @@
  */
 package com.facebook.presto.spi.page;
 
+import com.facebook.presto.common.io.PageCodecMarker;
 import org.testng.annotations.Test;
 
-import static com.facebook.presto.spi.page.PageCodecMarker.COMPRESSED;
-import static com.facebook.presto.spi.page.PageCodecMarker.ENCRYPTED;
+import static com.facebook.presto.common.io.PageCodecMarker.COMPRESSED;
+import static com.facebook.presto.common.io.PageCodecMarker.ENCRYPTED;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;

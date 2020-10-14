@@ -13,8 +13,8 @@
  */
 package com.facebook.presto.execution.buffer;
 
-import com.facebook.presto.spi.page.PageCodecMarker;
-import com.facebook.presto.spi.page.SerializedPage;
+import com.facebook.presto.common.io.PageCodecMarker;
+import com.facebook.presto.common.io.SerializedPage;
 import com.google.common.collect.ImmutableList;
 import org.testng.annotations.Test;
 

@@ -14,7 +14,7 @@
 package com.facebook.presto.server;
 
 import com.facebook.airlift.log.Logger;
-import com.facebook.presto.spi.page.SerializedPage;
+import com.facebook.presto.common.io.SerializedPage;
 import io.airlift.slice.Slice;
 
 import javax.servlet.AsyncContext;

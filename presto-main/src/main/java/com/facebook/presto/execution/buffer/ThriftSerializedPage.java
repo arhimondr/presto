@@ -16,12 +16,12 @@ package com.facebook.presto.execution.buffer;
 import com.facebook.drift.annotations.ThriftConstructor;
 import com.facebook.drift.annotations.ThriftField;
 import com.facebook.drift.annotations.ThriftStruct;
-import com.facebook.presto.spi.page.SerializedPage;
+import com.facebook.presto.common.io.SerializedPage;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 
-import static com.facebook.presto.spi.page.PageCodecMarker.COMPRESSED;
-import static com.facebook.presto.spi.page.PageCodecMarker.ENCRYPTED;
+import static com.facebook.presto.common.io.PageCodecMarker.COMPRESSED;
+import static com.facebook.presto.common.io.PageCodecMarker.ENCRYPTED;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
