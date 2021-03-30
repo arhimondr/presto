@@ -176,6 +176,7 @@ import static com.facebook.airlift.concurrent.Threads.daemonThreadsNamed;
 import static com.facebook.airlift.configuration.ConfigBinder.configBinder;
 import static com.facebook.airlift.json.JsonBinder.jsonBinder;
 import static com.facebook.airlift.json.JsonCodecBinder.jsonCodecBinder;
+import static com.facebook.presto.server.smile.SmileCodecBinder.smileCodecBinder;
 import static com.google.inject.multibindings.MapBinder.newMapBinder;
 import static com.google.inject.multibindings.Multibinder.newSetBinder;
 import static java.util.Objects.requireNonNull;
@@ -222,7 +223,6 @@ public class PrestoSparkModule
         jsonCodecBinder(binder).bindJsonCodec(TaskInfo.class);
         jsonCodecBinder(binder).bindJsonCodec(PrestoSparkTaskDescriptor.class);
         jsonCodecBinder(binder).bindJsonCodec(PlanFragment.class);
-        jsonCodecBinder(binder).bindJsonCodec(TaskSource.class);
         jsonCodecBinder(binder).bindJsonCodec(TableCommitContext.class);
         jsonCodecBinder(binder).bindJsonCodec(ExplainAnalyzeContext.class);
         jsonCodecBinder(binder).bindJsonCodec(ExecutionFailureInfo.class);
@@ -231,6 +231,9 @@ public class PrestoSparkModule
         jsonCodecBinder(binder).bindJsonCodec(QueryInfo.class);
         jsonCodecBinder(binder).bindJsonCodec(PrestoSparkQueryStatusInfo.class);
         jsonCodecBinder(binder).bindJsonCodec(PrestoSparkQueryData.class);
+
+        // smile codecs
+        smileCodecBinder(binder).bindSmileCodec(TaskSource.class);
 
         // index manager
         binder.bind(IndexManager.class).in(Scopes.SINGLETON);

@@ -14,6 +14,7 @@
 package com.facebook.presto.spark.util;
 
 import com.facebook.presto.common.block.BlockEncodingManager;
+import com.facebook.presto.server.smile.SmileCodec;
 import com.facebook.presto.spark.classloader_interface.PrestoSparkSerializedPage;
 import com.facebook.presto.spi.page.PageCompressor;
 import com.facebook.presto.spi.page.PageDecompressor;
@@ -35,7 +36,10 @@ import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.zip.Deflater;
 import java.util.zip.DeflaterInputStream;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.InflaterInputStream;
 import java.util.zip.InflaterOutputStream;
 
 import static com.facebook.presto.common.block.BlockUtil.compactArray;
@@ -44,6 +48,7 @@ import static com.google.common.base.Throwables.propagateIfPossible;
 import static com.google.common.io.ByteStreams.toByteArray;
 import static java.lang.Math.toIntExact;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.zip.Deflater.BEST_COMPRESSION;
 
 public class PrestoSparkUtils
 {
@@ -91,6 +96,30 @@ public class PrestoSparkUtils
             throw new UncheckedIOException(e);
         }
         return output.toByteArray();
+    }
+
+    public static <T> byte[] serializeToCompressedSmile(SmileCodec<T> codec, T instance)
+    {
+        ByteArrayOutputStream rawOutput = new ByteArrayOutputStream();
+        Deflater deflater = new Deflater();
+        deflater.setLevel(BEST_COMPRESSION);
+        try (DeflaterOutputStream deflateOutput = new DeflaterOutputStream(rawOutput, deflater)) {
+            codec.writeSmile(deflateOutput, instance);
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return rawOutput.toByteArray();
+    }
+
+    public static <T> T deserializeFromCompressedSmile(SmileCodec<T> codec, byte[] bytes)
+    {
+        try (InflaterInputStream inflateInput = new InflaterInputStream(new ByteArrayInputStream(bytes))) {
+            return codec.readSmile(inflateInput);
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     public static PagesSerde createPagesSerde(BlockEncodingManager blockEncodingManager)

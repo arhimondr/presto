@@ -22,6 +22,8 @@ import com.google.common.reflect.TypeParameter;
 import com.google.common.reflect.TypeToken;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
@@ -159,6 +161,26 @@ public class SmileCodec<T>
     public T fromBytes(byte[] bytes)
     {
         return fromSmile(bytes);
+    }
+
+    public void writeSmile(OutputStream output, T instance)
+    {
+        try {
+            mapper.writeValue(output, instance);
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException(format("%s could not be converted to SMILE", instance.getClass().getName()), e);
+        }
+    }
+
+    public T readSmile(InputStream input)
+    {
+        try {
+            return mapper.readValue(input, javaType);
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException(format("Invalid SMILE bytes for %s", javaType), e);
+        }
     }
 
     @SuppressWarnings("unchecked")

@@ -27,6 +27,7 @@ import com.facebook.presto.security.AccessControlModule;
 import com.facebook.presto.server.PluginManager;
 import com.facebook.presto.server.SessionPropertyDefaults;
 import com.facebook.presto.server.security.PasswordAuthenticatorManager;
+import com.facebook.presto.server.smile.SmileModule;
 import com.facebook.presto.spark.classloader_interface.SparkProcessType;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.parser.SqlParserOptions;
@@ -131,6 +132,7 @@ public class PrestoSparkInjectorFactory
         ImmutableList.Builder<Module> modules = ImmutableList.builder();
         modules.add(
                 new JsonModule(),
+                new SmileModule(),
                 new EventListenerModule(),
                 new PrestoSparkModule(sparkProcessType, sqlParserOptions),
                 new WarningCollectorModule());
