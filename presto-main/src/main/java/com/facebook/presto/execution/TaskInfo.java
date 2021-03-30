@@ -136,7 +136,7 @@ public class TaskInfo
                     lastHeartbeat,
                     outputBuffers.summarize(),
                     noMoreSplits,
-                    stats.summarizeFinal(),
+                    stats.summarizePipelineStats(),
                     needsPlan,
                     metadataUpdates,
                     nodeId);
@@ -147,7 +147,7 @@ public class TaskInfo
                 lastHeartbeat,
                 outputBuffers.summarize(),
                 noMoreSplits,
-                stats.summarize(),
+                stats.dropPipelineStats(),
                 needsPlan,
                 metadataUpdates,
                 nodeId);

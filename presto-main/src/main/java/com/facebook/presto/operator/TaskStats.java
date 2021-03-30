@@ -463,7 +463,7 @@ public class TaskStats
         return fullGcTimeInMillis;
     }
 
-    public TaskStats summarize()
+    public TaskStats dropPipelineStats()
     {
         return new TaskStats(
                 createTime,
@@ -505,7 +505,7 @@ public class TaskStats
                 ImmutableList.of());
     }
 
-    public TaskStats summarizeFinal()
+    public TaskStats summarizePipelineStats()
     {
         return new TaskStats(
                 createTime,

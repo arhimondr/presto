@@ -220,7 +220,6 @@ public class PrestoSparkModule
 
         // json codecs
         jsonCodecBinder(binder).bindJsonCodec(ViewDefinition.class);
-        jsonCodecBinder(binder).bindJsonCodec(TaskInfo.class);
         jsonCodecBinder(binder).bindJsonCodec(PrestoSparkTaskDescriptor.class);
         jsonCodecBinder(binder).bindJsonCodec(PlanFragment.class);
         jsonCodecBinder(binder).bindJsonCodec(TableCommitContext.class);
@@ -234,6 +233,7 @@ public class PrestoSparkModule
 
         // smile codecs
         smileCodecBinder(binder).bindSmileCodec(TaskSource.class);
+        smileCodecBinder(binder).bindSmileCodec(TaskInfo.class);
 
         // index manager
         binder.bind(IndexManager.class).in(Scopes.SINGLETON);

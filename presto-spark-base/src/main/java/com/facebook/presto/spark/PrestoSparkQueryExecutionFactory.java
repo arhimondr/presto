@@ -50,6 +50,7 @@ import com.facebook.presto.server.BasicQueryInfo;
 import com.facebook.presto.server.QuerySessionSupplier;
 import com.facebook.presto.server.SessionContext;
 import com.facebook.presto.server.SessionPropertyDefaults;
+import com.facebook.presto.server.smile.SmileCodec;
 import com.facebook.presto.spark.classloader_interface.IPrestoSparkQueryExecution;
 import com.facebook.presto.spark.classloader_interface.IPrestoSparkQueryExecutionFactory;
 import com.facebook.presto.spark.classloader_interface.IPrestoSparkTaskExecutor;
@@ -73,7 +74,6 @@ import com.facebook.presto.spark.planner.PrestoSparkPlanFragmenter;
 import com.facebook.presto.spark.planner.PrestoSparkQueryPlanner;
 import com.facebook.presto.spark.planner.PrestoSparkQueryPlanner.PlanAndMore;
 import com.facebook.presto.spark.planner.PrestoSparkRddFactory;
-import com.facebook.presto.spark.util.PrestoSparkUtils;
 import com.facebook.presto.spi.ConnectorId;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ErrorCode;
@@ -120,6 +120,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -154,6 +155,7 @@ import static com.facebook.presto.spark.classloader_interface.ScalaUtils.collect
 import static com.facebook.presto.spark.classloader_interface.ScalaUtils.emptyScalaIterator;
 import static com.facebook.presto.spark.util.PrestoSparkUtils.computeNextTimeout;
 import static com.facebook.presto.spark.util.PrestoSparkUtils.createPagesSerde;
+import static com.facebook.presto.spark.util.PrestoSparkUtils.deserializeFromCompressedSmile;
 import static com.facebook.presto.spark.util.PrestoSparkUtils.getActionResultWithTimeout;
 import static com.facebook.presto.spark.util.PrestoSparkUtils.toSerializedPage;
 import static com.facebook.presto.spi.StandardErrorCode.EXCEEDED_TIME_LIMIT;
@@ -196,7 +198,7 @@ public class PrestoSparkQueryExecutionFactory
     private final PrestoSparkRddFactory rddFactory;
     private final PrestoSparkMetadataStorage metadataStorage;
     private final QueryMonitor queryMonitor;
-    private final JsonCodec<TaskInfo> taskInfoJsonCodec;
+    private final SmileCodec<TaskInfo> taskInfoSmileCodec;
     private final JsonCodec<PrestoSparkTaskDescriptor> sparkTaskDescriptorJsonCodec;
     private final JsonCodec<PrestoSparkQueryStatusInfo> queryStatusInfoJsonCodec;
     private final JsonCodec<PrestoSparkQueryData> queryDataJsonCodec;
@@ -226,7 +228,7 @@ public class PrestoSparkQueryExecutionFactory
             PrestoSparkRddFactory rddFactory,
             PrestoSparkMetadataStorage metadataStorage,
             QueryMonitor queryMonitor,
-            JsonCodec<TaskInfo> taskInfoJsonCodec,
+            SmileCodec<TaskInfo> taskInfoSmileCodec,
             JsonCodec<PrestoSparkTaskDescriptor> sparkTaskDescriptorJsonCodec,
             JsonCodec<PrestoSparkQueryStatusInfo> queryStatusInfoJsonCodec,
             JsonCodec<PrestoSparkQueryData> queryDataJsonCodec,
@@ -253,7 +255,7 @@ public class PrestoSparkQueryExecutionFactory
         this.rddFactory = requireNonNull(rddFactory, "rddFactory is null");
         this.metadataStorage = requireNonNull(metadataStorage, "metadataStorage is null");
         this.queryMonitor = requireNonNull(queryMonitor, "queryMonitor is null");
-        this.taskInfoJsonCodec = requireNonNull(taskInfoJsonCodec, "taskInfoJsonCodec is null");
+        this.taskInfoSmileCodec = requireNonNull(taskInfoSmileCodec, "taskInfoSmileCodec is null");
         this.sparkTaskDescriptorJsonCodec = requireNonNull(sparkTaskDescriptorJsonCodec, "sparkTaskDescriptorJsonCodec is null");
         this.queryStatusInfoJsonCodec = requireNonNull(queryStatusInfoJsonCodec, "queryStatusInfoJsonCodec is null");
         this.queryDataJsonCodec = requireNonNull(queryDataJsonCodec, "queryDataJsonCodec is null");
@@ -373,7 +375,7 @@ public class PrestoSparkQueryExecutionFactory
                     planAndMore,
                     fragmentedPlan,
                     sparkQueueName,
-                    taskInfoJsonCodec,
+                    taskInfoSmileCodec,
                     sparkTaskDescriptorJsonCodec,
                     queryStatusInfoJsonCodec,
                     queryDataJsonCodec,
@@ -716,7 +718,7 @@ public class PrestoSparkQueryExecutionFactory
         private final SubPlan fragmentedPlan;
         private final Optional<String> sparkQueueName;
 
-        private final JsonCodec<TaskInfo> taskInfoJsonCodec;
+        private final SmileCodec<TaskInfo> taskInfoSmileCodec;
         private final JsonCodec<PrestoSparkTaskDescriptor> sparkTaskDescriptorJsonCodec;
         private final JsonCodec<PrestoSparkQueryStatusInfo> queryStatusInfoJsonCodec;
         private final JsonCodec<PrestoSparkQueryData> queryDataJsonCodec;
@@ -748,7 +750,7 @@ public class PrestoSparkQueryExecutionFactory
                 PlanAndMore planAndMore,
                 SubPlan fragmentedPlan,
                 Optional<String> sparkQueueName,
-                JsonCodec<TaskInfo> taskInfoJsonCodec,
+                SmileCodec<TaskInfo> taskInfoSmileCodec,
                 JsonCodec<PrestoSparkTaskDescriptor> sparkTaskDescriptorJsonCodec,
                 JsonCodec<PrestoSparkQueryStatusInfo> queryStatusInfoJsonCodec,
                 JsonCodec<PrestoSparkQueryData> queryDataJsonCodec,
@@ -779,7 +781,7 @@ public class PrestoSparkQueryExecutionFactory
             this.fragmentedPlan = requireNonNull(fragmentedPlan, "fragmentedPlan is null");
             this.sparkQueueName = requireNonNull(sparkQueueName, "sparkQueueName is null");
 
-            this.taskInfoJsonCodec = requireNonNull(taskInfoJsonCodec, "taskInfoJsonCodec is null");
+            this.taskInfoSmileCodec = requireNonNull(taskInfoSmileCodec, "taskInfoSmileCodec is null");
             this.sparkTaskDescriptorJsonCodec = requireNonNull(sparkTaskDescriptorJsonCodec, "sparkTaskDescriptorJsonCodec is null");
             this.queryStatusInfoJsonCodec = requireNonNull(queryStatusInfoJsonCodec, "queryStatusInfoJsonCodec is null");
             this.queryDataJsonCodec = requireNonNull(queryDataJsonCodec, "queryDataJsonCodec is null");
@@ -1039,12 +1041,28 @@ public class PrestoSparkQueryExecutionFactory
         private void queryCompletedEvent(Optional<ExecutionFailureInfo> failureInfo, OptionalLong updateCount)
         {
             List<SerializedTaskInfo> serializedTaskInfos = taskInfoCollector.value();
-            List<TaskInfo> taskInfos = serializedTaskInfos.stream()
-                    .map(SerializedTaskInfo::getBytes)
-                    .map(PrestoSparkUtils::decompress)
-                    .map(taskInfoJsonCodec::fromJson)
-                    .collect(toImmutableList());
-            StageInfo stageInfo = createStageInfo(session.getQueryId(), fragmentedPlan, taskInfos);
+            ImmutableList.Builder<TaskInfo> taskInfos = ImmutableList.builder();
+            long totalSerializedTaskInfoSizeInBytes = 0;
+            boolean missingPipelineStats = false;
+            Set<Integer> fragmentsWithMissingPipelineStats = new HashSet<>();
+            for (SerializedTaskInfo serializedTaskInfo : serializedTaskInfos) {
+                byte[] bytes = serializedTaskInfo.clear();
+                totalSerializedTaskInfoSizeInBytes += bytes.length;
+                TaskInfo taskInfo = deserializeFromCompressedSmile(taskInfoSmileCodec, bytes);
+                if (taskInfo.getStats().getPipelines().isEmpty()) {
+                    missingPipelineStats = true;
+                    fragmentsWithMissingPipelineStats.add(taskInfo.getTaskId().getStageExecutionId().getStageId().getId());
+                }
+                taskInfos.add(taskInfo);
+            }
+            taskInfoCollector.reset();
+
+            log.info("Total serialized task info size: %s", DataSize.succinctBytes(totalSerializedTaskInfoSizeInBytes));
+            if (missingPipelineStats) {
+                log.warn("Missing pipeline statistics for fragments %s, operator level metrics may be incomplete", fragmentsWithMissingPipelineStats);
+            }
+
+            StageInfo stageInfo = createStageInfo(session.getQueryId(), fragmentedPlan, taskInfos.build());
             QueryState queryState = failureInfo.isPresent() ? FAILED : FINISHED;
 
             QueryInfo queryInfo = createQueryInfo(
@@ -1073,7 +1091,7 @@ public class PrestoSparkQueryExecutionFactory
 
         private void processShuffleStats()
         {
-            List<PrestoSparkShuffleStats> statsList = new ArrayList<>(shuffleStatsCollector.value());
+            List<PrestoSparkShuffleStats> statsList = shuffleStatsCollector.value();
             Map<ShuffleStatsKey, List<PrestoSparkShuffleStats>> statsMap = new TreeMap<>();
             for (PrestoSparkShuffleStats stats : statsList) {
                 ShuffleStatsKey key = new ShuffleStatsKey(stats.getFragmentId(), stats.getOperation());
@@ -1083,6 +1101,7 @@ public class PrestoSparkQueryExecutionFactory
             for (Map.Entry<ShuffleStatsKey, List<PrestoSparkShuffleStats>> fragment : statsMap.entrySet()) {
                 logShuffleStatsSummary(fragment.getKey(), fragment.getValue());
             }
+            shuffleStatsCollector.reset();
         }
 
         private void logShuffleStatsSummary(ShuffleStatsKey key, List<PrestoSparkShuffleStats> statsList)

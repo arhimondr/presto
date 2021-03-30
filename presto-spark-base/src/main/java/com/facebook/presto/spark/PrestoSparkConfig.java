@@ -35,6 +35,7 @@ public class PrestoSparkConfig
     private DataSize storageBasedBroadcastJoinWriteBufferSize = new DataSize(24, MEGABYTE);
     private String storageBasedBroadcastJoinStorage = "local";
     private DataSize sparkBroadcastJoinMaxMemoryOverride;
+    private DataSize taskInfoCompactionThreshold = new DataSize(10, KILOBYTE);
 
     public boolean isSparkPartitionCountAutoTuneEnabled()
     {
@@ -163,6 +164,19 @@ public class PrestoSparkConfig
     public PrestoSparkConfig setSparkBroadcastJoinMaxMemoryOverride(DataSize sparkBroadcastJoinMaxMemoryOverride)
     {
         this.sparkBroadcastJoinMaxMemoryOverride = sparkBroadcastJoinMaxMemoryOverride;
+        return this;
+    }
+
+    @NotNull
+    public DataSize getTaskInfoCompactionThreshold()
+    {
+        return taskInfoCompactionThreshold;
+    }
+
+    @Config("spark.task-info-compaction-threshold")
+    public PrestoSparkConfig setTaskInfoCompactionThreshold(DataSize taskInfoCompactionThreshold)
+    {
+        this.taskInfoCompactionThreshold = taskInfoCompactionThreshold;
         return this;
     }
 }

@@ -20,6 +20,7 @@ import org.testng.annotations.Test;
 
 import static com.facebook.presto.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
 import static com.facebook.presto.spark.PrestoSparkSessionProperties.STORAGE_BASED_BROADCAST_JOIN_ENABLED;
+import static com.facebook.presto.spark.PrestoSparkSessionProperties.TASK_INFO_COMPACTION_THRESHOLD;
 import static com.facebook.presto.testing.assertions.Assert.assertEquals;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -608,6 +609,36 @@ public class TestPrestoSparkQueryRunner
                 "SELECT o.custkey, l.orderkey " +
                         "FROM (SELECT * FROM lineitem WHERE linenumber = 4) l " +
                         "CROSS JOIN (SELECT * FROM orders WHERE orderkey = 5) o");
+    }
+
+    @Test
+    public void testMissingPipelineStatistics()
+    {
+        Session session = Session.builder(getSession())
+                .setSystemProperty(TASK_INFO_COMPACTION_THRESHOLD, "1B")
+                .build();
+
+        // Select
+        assertQuery(session, "select * from lineitem l join orders o on l.orderkey = o.orderkey");
+
+        // CTAS
+        assertUpdate(
+                session,
+                "CREATE TABLE hive.hive_test.hive_orders_test_missing_pipeline_stats AS " +
+                        "SELECT orderkey, custkey, orderstatus, totalprice, orderdate, orderpriority, clerk, shippriority, comment " +
+                        "FROM orders",
+                15000);
+
+        // Insert
+        assertUpdate(
+                session,
+                "INSERT INTO hive.hive_test.hive_orders_test_missing_pipeline_stats " +
+                        "SELECT orderkey, custkey, orderstatus, totalprice, orderdate, orderpriority, clerk, shippriority, comment " +
+                        "FROM orders " +
+                        "UNION ALL " +
+                        "SELECT orderkey, custkey, orderstatus, totalprice, orderdate, orderpriority, clerk, shippriority, comment " +
+                        "FROM orders",
+                30000);
     }
 
     private void assertBucketedQuery(String sql)

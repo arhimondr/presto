@@ -37,6 +37,7 @@ public class PrestoSparkSessionProperties
     public static final String STORAGE_BASED_BROADCAST_JOIN_ENABLED = "storage_based_broadcast_join_enabled";
     public static final String STORAGE_BASED_BROADCAST_JOIN_WRITE_BUFFER_SIZE = "storage_based_broadcast_join_write_buffer_size";
     public static final String SPARK_BROADCAST_JOIN_MAX_MEMORY_OVERRIDE = "spark_broadcast_join_max_memory_override";
+    public static final String TASK_INFO_COMPACTION_THRESHOLD = "task_info_compaction_threshold";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -88,7 +89,12 @@ public class PrestoSparkSessionProperties
                         SPARK_BROADCAST_JOIN_MAX_MEMORY_OVERRIDE,
                         "Maximum size of broadcast table in Presto on Spark",
                         prestoSparkConfig.getSparkBroadcastJoinMaxMemoryOverride(),
-                        false));
+                        false),
+                dataSizeProperty(
+                        TASK_INFO_COMPACTION_THRESHOLD,
+                        "Serialized task info size threshold at which an executor will try to compact",
+                        prestoSparkConfig.getTaskInfoCompactionThreshold(),
+                        true));
     }
 
     public List<PropertyMetadata<?>> getSessionProperties()
@@ -139,5 +145,10 @@ public class PrestoSparkSessionProperties
     public static DataSize getSparkBroadcastJoinMaxMemoryOverride(Session session)
     {
         return session.getSystemProperty(SPARK_BROADCAST_JOIN_MAX_MEMORY_OVERRIDE, DataSize.class);
+    }
+
+    public static DataSize getTaskInfoCompactionThreshold(Session session)
+    {
+        return session.getSystemProperty(TASK_INFO_COMPACTION_THRESHOLD, DataSize.class);
     }
 }
