@@ -44,8 +44,8 @@ fi
 export COMPILER_FLAGS=$(echo -n $(get_cxx_flags $CPU_TARGET))
 
 (
-  wget --max-redirect 3 https://download.libsodium.org/libsodium/releases/LATEST.tar.gz &&
-  tar -xzvf LATEST.tar.gz &&
+  wget --max-redirect 3 https://download.libsodium.org/libsodium/releases/libsodium-1.0.18-stable.tar.gz &&
+  tar -xzvf libsodium-1.0.18-stable.tar.gz &&
   cd libsodium-stable &&
   ./configure &&
   make "-j$(nproc)" &&
@@ -93,6 +93,7 @@ export COMPILER_FLAGS=$(echo -n $(get_cxx_flags $CPU_TARGET))
 (
   git clone https://github.com/google/re2 &&
   cd re2 &&
+  git checkout tags/2023-03-01 &&
   cmake_install -DBUILD_SHARED_LIBS=ON
 )
 
@@ -111,5 +112,3 @@ export COMPILER_FLAGS=$(echo -n $(get_cxx_flags $CPU_TARGET))
   git checkout $FB_OS_VERSION &&
   cmake_install -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DBUILD_SHARED_LIBS=ON
 )
-
-dnf clean all
