@@ -45,8 +45,6 @@ RUN --mount=type=bind,rw,source="scripts",target="/opt/scripts" \
 
 RUN rm -rf /opt/dependency/* && dnf clean all
 
-WORKDIR /src
-
 #####################################
 # END OF INSTALL DEPENDENCIES STAGE #
 #####################################
