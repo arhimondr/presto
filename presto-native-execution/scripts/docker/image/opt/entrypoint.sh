@@ -14,18 +14,14 @@
 set -eExv -o functrace
 
 SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
-PRESTO_HOME="${PRESTO_HOME:-"/opt/presto"}"
-USE_ENV_PARAMS=${USE_ENV_PARAMS:-0}
-
-source "${SCRIPT_DIR}/common.sh"
 
 trap 'exit 2' SIGSTOP SIGINT SIGTERM SIGQUIT
-trap 'failure "LINENO" "BASH_LINENO" "${BASH_COMMAND}" "${?}"; [ -z "${DEBUG}" ] && exit 1 || sleep 3600' ERR
 
 if [[ "${DEBUG}" == "0" || "${DEBUG}" == "false" || "${DEBUG}" == "False" ]]; then DEBUG=""; fi
 
-HTTP_SERVER_PORT="${HTTP_SERVER_PORT:-"8080"}"
-DISCOVERY_URI="${HTTP_SERVER_PORT:-"http://127.0.0.1:${HTTP_SERVER_PORT}"}"
+DISCOVERY_URI="${DISCOVERY_URI:-"http://127.0.0.1:8080"}"
+HTTP_SERVER_PORT="${HTTP_SERVER_PORT:-"8081"}"
+NODE_MEMORY_GB="${NODE_MEMORY_GB:-"32"}"
 
 while getopts ':-:' optchar; do
   case "$optchar" in
@@ -34,7 +30,6 @@ while getopts ':-:' optchar; do
         discovery-uri=*) DISCOVERY_URI="${OPTARG#*=}" ;;
         http-server-port=*) HTTP_SERVER_PORT="${OPTARG#*=}" ;;
         node-memory-gb=*) NODE_MEMORY_GB="${OPTARG#*=}" ;;
-        use-env-params) USE_ENV_PARAMS=1 ;;
         *)
           presto_args+=($optchar)
           ;;
@@ -46,39 +41,38 @@ while getopts ':-:' optchar; do
   esac
 done
 
+if [[ ! -f "/opt/presto/config.properties" ]]; then
+  cat > "/opt/presto/config.properties" << EOF
+presto.version=testversion
+discovery.uri=${DISCOVERY_URI}
+http-server.http.port=${HTTP_SERVER_PORT}
+shutdown-onset-sec=1
+register-test-functions=true
+EOF
+fi
 
-function node_command_line_config()
-{
-  printf "presto.version=0.273.3\n"                    >  "${PRESTO_HOME}/config.properties"
-  printf "discovery.uri=${DISCOVERY_URI}\n"            >> "${PRESTO_HOME}/config.properties"
-  printf "http-server.http.port=${HTTP_SERVER_PORT}\n" >> "${PRESTO_HOME}/config.properties"
+if [[ ! -f "/opt/presto/node.properties" ]]; then
+  cat > "/opt/presto/node.properties" << EOF
+node.environment=testing
+node.location=testing-location
+node.id=e4901aae-a1c9-4ff7-97a9-5687835ad54c
+node.ip=127.0.0.1
+node.memory_gb=${NODE_MEMORY_GB}
+EOF
+fi
 
-  printf "node.environment=intel-poland\n"    >  "${PRESTO_HOME}/node.properties"
-  printf "node.location=torun-cluster\n"      >> "${PRESTO_HOME}/node.properties"
-  printf "node.id=${NODE_UUID}\n"             >> "${PRESTO_HOME}/node.properties"
-  printf "node.ip=$(hostname -I)\n"           >> "${PRESTO_HOME}/node.properties"
-  printf "node.memory_gb=${NODE_MEMORY_GB}\n" >> "${PRESTO_HOME}/node.properties"
-}
+if [[ ! -f "/opt/presto/catalog/hive.properties" ]]; then
+  cat > "/opt/presto/catalog/hive.properties" << EOF
+connector.name=hive
+cache.enabled=true
+EOF
+fi
 
-function node_configuration()
-{
-  render_node_configuration_files
+if [[ ! -f "/opt/presto/catalog/tpchstandard.properties" ]]; then
+  cat > "/opt/presto/catalog/tpchstandard.properties" << EOF
+connector.name=tpch
+EOF
+fi
 
-  [ -z "$NODE_UUID" ] && NODE_UUID=$(uuid) || return -2
-
-  if [[ -z "$(grep -E '^ *node\.id=' "${PRESTO_HOME}/node.properties" | cut -d'=' -f2)" ]]; then
-    printf "node.id=${NODE_UUID}\n" >> "${PRESTO_HOME}/node.properties"
-  fi
-  printf "node.ip=$(hostname -I)\n" >> "${PRESTO_HOME}/node.properties"
-
-  if [[ -z "$(grep -E '^ *node\.memory_gb=' "${PRESTO_HOME}/node.properties")" ]]; then
-    printf "node.memory_gb=${NODE_MEMORY_GB}\n" >> "${PRESTO_HOME}/node.properties"
-  fi
-}
-
-NODE_MEMORY_GB="$(memory_gb_preflight_check ${NODE_MEMORY_GB})"
-
-[ $USE_ENV_PARAMS == "1" ] && node_command_line_config || node_configuration
-
-cd "${PRESTO_HOME}"
-"${PRESTO_HOME}/presto_server" --logtostderr=1 --v=1 "${presto_args[@]}"
+cd "/opt/presto"
+"/opt/presto/presto_server" --logtostderr=1 --v=1 "${presto_args[@]}"

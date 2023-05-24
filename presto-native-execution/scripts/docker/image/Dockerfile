@@ -21,7 +21,6 @@ ENV PRESTO_HOME="/opt/presto/"
 WORKDIR /opt/presto/
 
 COPY --chown=${PRESTO_UID} opt/ /opt/
-COPY --chown=${PRESTO_UID} etc/ /opt/presto/etc/
 COPY --chown=${PRESTO_UID} presto_server /opt/presto/presto_server
 
 RUN set -exu && \
@@ -34,6 +33,6 @@ RUN set -exu && \
 
 USER ${PRESTO_UID}
 
-RUN mkdir /opt/presto/catalog
+RUN mkdir /opt/presto/catalog /opt/presto/etc
 
 ENTRYPOINT [ "/opt/entrypoint.sh" ]
