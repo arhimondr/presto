@@ -35,8 +35,8 @@ while getopts ':-:' optchar; do
   esac
 done
 
-if [[ ! -f "/opt/presto/config.properties" ]]; then
-  cat > "/opt/presto/config.properties" << EOF
+if [[ ! -f "/opt/presto/etc/config.properties" ]]; then
+  cat > "/opt/presto/etc/config.properties" << EOF
 presto.version=testversion
 discovery.uri=${DISCOVERY_URI}
 http-server.http.port=${HTTP_SERVER_PORT}
@@ -45,8 +45,8 @@ register-test-functions=true
 EOF
 fi
 
-if [[ ! -f "/opt/presto/node.properties" ]]; then
-  cat > "/opt/presto/node.properties" << EOF
+if [[ ! -f "/opt/presto/etc/node.properties" ]]; then
+  cat > "/opt/presto/etc/node.properties" << EOF
 node.environment=testing
 node.location=testing-location
 node.id=e4901aae-a1c9-4ff7-97a9-5687835ad54c
@@ -55,18 +55,18 @@ node.memory_gb=${NODE_MEMORY_GB}
 EOF
 fi
 
-if [[ ! -f "/opt/presto/catalog/hive.properties" ]]; then
-  cat > "/opt/presto/catalog/hive.properties" << EOF
+if [[ ! -f "/opt/presto/etc/catalog/hive.properties" ]]; then
+  cat > "/opt/presto/etc/catalog/hive.properties" << EOF
 connector.name=hive
 cache.enabled=true
 EOF
 fi
 
-if [[ ! -f "/opt/presto/catalog/tpchstandard.properties" ]]; then
-  cat > "/opt/presto/catalog/tpchstandard.properties" << EOF
+if [[ ! -f "/opt/presto/etc/catalog/tpchstandard.properties" ]]; then
+  cat > "/opt/presto/etc/catalog/tpchstandard.properties" << EOF
 connector.name=tpch
 EOF
 fi
 
-cd "/opt/presto"
+cd "/opt/presto/etc"
 exec "/opt/presto/presto_server" --logtostderr=1 --v=1 "${presto_args[@]}"
