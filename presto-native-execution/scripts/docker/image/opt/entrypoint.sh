@@ -13,12 +13,6 @@
 
 set -eExv -o functrace
 
-SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
-
-trap 'exit 2' SIGSTOP SIGINT SIGTERM SIGQUIT
-
-if [[ "${DEBUG}" == "0" || "${DEBUG}" == "false" || "${DEBUG}" == "False" ]]; then DEBUG=""; fi
-
 DISCOVERY_URI="${DISCOVERY_URI:-"http://127.0.0.1:8080"}"
 HTTP_SERVER_PORT="${HTTP_SERVER_PORT:-"8081"}"
 NODE_MEMORY_GB="${NODE_MEMORY_GB:-"32"}"
@@ -75,4 +69,4 @@ EOF
 fi
 
 cd "/opt/presto"
-"/opt/presto/presto_server" --logtostderr=1 --v=1 "${presto_args[@]}"
+exec "/opt/presto/presto_server" --logtostderr=1 --v=1 "${presto_args[@]}"
