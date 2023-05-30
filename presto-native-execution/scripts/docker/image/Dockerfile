@@ -33,6 +33,6 @@ RUN set -exu && \
 
 USER ${PRESTO_UID}
 
-RUN mkdir /opt/presto/etc /opt/presto/etc/catalog
+RUN mkdir /opt/presto/etc /opt/presto/etc/catalog /opt/presto/_etc /opt/presto/_etc/catalog
 
 ENTRYPOINT [ "/opt/entrypoint.sh" ]

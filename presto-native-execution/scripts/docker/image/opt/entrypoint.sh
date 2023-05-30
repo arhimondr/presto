@@ -44,16 +44,18 @@ shutdown-onset-sec=1
 register-test-functions=true
 EOF
 fi
+cp /opt/presto/etc/config.properties /opt/presto/_etc/config.properties
 
 if [[ ! -f "/opt/presto/etc/node.properties" ]]; then
   cat > "/opt/presto/etc/node.properties" << EOF
 node.environment=testing
 node.location=testing-location
-node.id=e4901aae-a1c9-4ff7-97a9-5687835ad54c
 node.ip=127.0.0.1
 node.memory_gb=${NODE_MEMORY_GB}
 EOF
 fi
+cp /opt/presto/etc/node.properties /opt/presto/_etc/node.properties
+echo -e "\nnode.id=$(hostname)\n" >> /opt/presto/_etc/node.properties
 
 if [[ ! -f "/opt/presto/etc/catalog/hive.properties" ]]; then
   cat > "/opt/presto/etc/catalog/hive.properties" << EOF
@@ -68,5 +70,7 @@ connector.name=tpch
 EOF
 fi
 
-cd "/opt/presto/etc"
+cp /opt/presto/etc/catalog/* /opt/presto/_etc/catalog
+
+cd "/opt/presto/_etc"
 exec "/opt/presto/presto_server" --logtostderr=1 --v=1 "${presto_args[@]}"
