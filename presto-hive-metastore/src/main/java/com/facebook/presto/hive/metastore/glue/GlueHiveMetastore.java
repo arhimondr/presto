@@ -30,14 +30,24 @@ import com.amazonaws.services.glue.model.BatchCreatePartitionRequest;
 import com.amazonaws.services.glue.model.BatchCreatePartitionResult;
 import com.amazonaws.services.glue.model.BatchGetPartitionRequest;
 import com.amazonaws.services.glue.model.BatchGetPartitionResult;
+import com.amazonaws.services.glue.model.BinaryColumnStatisticsData;
+import com.amazonaws.services.glue.model.BooleanColumnStatisticsData;
+import com.amazonaws.services.glue.model.ColumnStatistics;
+import com.amazonaws.services.glue.model.ColumnStatisticsData;
+import com.amazonaws.services.glue.model.ColumnStatisticsType;
 import com.amazonaws.services.glue.model.CreateDatabaseRequest;
 import com.amazonaws.services.glue.model.CreateTableRequest;
 import com.amazonaws.services.glue.model.DatabaseInput;
+import com.amazonaws.services.glue.model.DateColumnStatisticsData;
+import com.amazonaws.services.glue.model.DecimalColumnStatisticsData;
 import com.amazonaws.services.glue.model.DeleteDatabaseRequest;
 import com.amazonaws.services.glue.model.DeletePartitionRequest;
 import com.amazonaws.services.glue.model.DeleteTableRequest;
+import com.amazonaws.services.glue.model.DoubleColumnStatisticsData;
 import com.amazonaws.services.glue.model.EntityNotFoundException;
 import com.amazonaws.services.glue.model.ErrorDetail;
+import com.amazonaws.services.glue.model.GetColumnStatisticsForTableRequest;
+import com.amazonaws.services.glue.model.GetColumnStatisticsForTableResult;
 import com.amazonaws.services.glue.model.GetDatabaseRequest;
 import com.amazonaws.services.glue.model.GetDatabaseResult;
 import com.amazonaws.services.glue.model.GetDatabasesRequest;
@@ -50,10 +60,12 @@ import com.amazonaws.services.glue.model.GetTableRequest;
 import com.amazonaws.services.glue.model.GetTableResult;
 import com.amazonaws.services.glue.model.GetTablesRequest;
 import com.amazonaws.services.glue.model.GetTablesResult;
+import com.amazonaws.services.glue.model.LongColumnStatisticsData;
 import com.amazonaws.services.glue.model.PartitionError;
 import com.amazonaws.services.glue.model.PartitionInput;
 import com.amazonaws.services.glue.model.PartitionValueList;
 import com.amazonaws.services.glue.model.Segment;
+import com.amazonaws.services.glue.model.StringColumnStatisticsData;
 import com.amazonaws.services.glue.model.TableInput;
 import com.amazonaws.services.glue.model.UpdateDatabaseRequest;
 import com.amazonaws.services.glue.model.UpdatePartitionRequest;
@@ -62,6 +74,7 @@ import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.hive.HdfsContext;
 import com.facebook.presto.hive.HdfsEnvironment;
+import com.facebook.presto.hive.HiveBasicStatistics;
 import com.facebook.presto.hive.HiveType;
 import com.facebook.presto.hive.PartitionNotFoundException;
 import com.facebook.presto.hive.SchemaAlreadyExistsException;
@@ -69,6 +82,7 @@ import com.facebook.presto.hive.TableAlreadyExistsException;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
+import com.facebook.presto.hive.metastore.HiveColumnStatistics;
 import com.facebook.presto.hive.metastore.HivePrivilegeInfo;
 import com.facebook.presto.hive.metastore.MetastoreContext;
 import com.facebook.presto.hive.metastore.MetastoreOperationResult;
@@ -103,13 +117,18 @@ import org.weakref.jmx.Managed;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalLong;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -117,11 +136,20 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 
+import static com.facebook.airlift.concurrent.MoreFutures.getFutureValue;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_METASTORE_ERROR;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_PARTITION_DROPPED_DURING_QUERY;
+import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createBinaryColumnStatistics;
+import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createBooleanColumnStatistics;
+import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createDateColumnStatistics;
+import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createDecimalColumnStatistics;
+import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createDoubleColumnStatistics;
+import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createIntegerColumnStatistics;
+import static com.facebook.presto.hive.metastore.HiveColumnStatistics.createStringColumnStatistics;
 import static com.facebook.presto.hive.metastore.MetastoreOperationResult.EMPTY_RESULT;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.createDirectory;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.deleteDirectoryRecursively;
+import static com.facebook.presto.hive.metastore.MetastoreUtil.fromMetastoreDistinctValuesCount;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.getHiveBasicStatistics;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.isManagedTable;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.makePartName;
@@ -133,14 +161,18 @@ import static com.facebook.presto.hive.metastore.glue.GlueExpressionUtil.buildGl
 import static com.facebook.presto.hive.metastore.glue.converter.GlueInputConverter.convertColumn;
 import static com.facebook.presto.hive.metastore.glue.converter.GlueInputConverter.toTableInput;
 import static com.facebook.presto.hive.metastore.glue.converter.GlueToPrestoConverter.mappedCopy;
+import static com.facebook.presto.hive.metastore.thrift.ThriftMetastoreUtil.fromMetastoreNullsCount;
+import static com.facebook.presto.hive.metastore.thrift.ThriftMetastoreUtil.getTotalSizeInBytes;
 import static com.facebook.presto.spi.StandardErrorCode.ALREADY_EXISTS;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.security.PrincipalType.USER;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.Comparators.lexicographical;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Comparator.comparing;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.CompletableFuture.supplyAsync;
 import static java.util.function.UnaryOperator.identity;
 import static java.util.stream.Collectors.toMap;
 
@@ -336,7 +368,118 @@ public class GlueHiveMetastore
     {
         Table table = getTable(metastoreContext, databaseName, tableName)
                 .orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
-        return new PartitionStatistics(getHiveBasicStatistics(table.getParameters()), ImmutableMap.of());
+        return new PartitionStatistics(getHiveBasicStatistics(table.getParameters()), getTableColumnStatistics(table));
+    }
+
+    private static final int GLUE_COLUMN_READ_STAT_PAGE_SIZE = 100;
+
+    private Map<String, HiveColumnStatistics> getTableColumnStatistics(Table table)
+    {
+        try {
+            List<String> columnNames = getAllColumns(table);
+            List<List<String>> columnChunks = Lists.partition(columnNames, GLUE_COLUMN_READ_STAT_PAGE_SIZE);
+            List<CompletableFuture<GetColumnStatisticsForTableResult>> getStatsFutures = columnChunks.stream()
+                    .map(partialColumns -> supplyAsync(() -> {
+                        GetColumnStatisticsForTableRequest request = new GetColumnStatisticsForTableRequest()
+                                .withDatabaseName(table.getDatabaseName())
+                                .withTableName(table.getTableName())
+                                .withColumnNames(partialColumns);
+                        return glueClient.getColumnStatisticsForTable(request);
+                    }, executor)).collect(toImmutableList());
+
+            HiveBasicStatistics tableStatistics = getHiveBasicStatistics(table.getParameters());
+            ImmutableMap.Builder<String, HiveColumnStatistics> columnStatsMapBuilder = ImmutableMap.builder();
+            for (CompletableFuture<GetColumnStatisticsForTableResult> future : getStatsFutures) {
+                GetColumnStatisticsForTableResult tableColumnsStats = getFutureValue(future, PrestoException.class);
+                for (ColumnStatistics columnStatistics : tableColumnsStats.getColumnStatisticsList()) {
+                    columnStatsMapBuilder.put(
+                            columnStatistics.getColumnName(),
+                            fromGlueColumnStatistics(columnStatistics.getStatisticsData(), tableStatistics.getRowCount()));
+                }
+            }
+            return columnStatsMapBuilder.build();
+        }
+        catch (RuntimeException ex) {
+            throw new PrestoException(HIVE_METASTORE_ERROR, ex);
+        }
+    }
+
+    public static HiveColumnStatistics fromGlueColumnStatistics(ColumnStatisticsData catalogColumnStatisticsData, OptionalLong rowCount)
+    {
+        ColumnStatisticsType type = ColumnStatisticsType.fromValue(catalogColumnStatisticsData.getType());
+        switch (type) {
+            case BINARY: {
+                BinaryColumnStatisticsData data = catalogColumnStatisticsData.getBinaryColumnStatisticsData();
+                OptionalLong max = OptionalLong.of(data.getMaximumLength());
+                OptionalDouble avg = OptionalDouble.of(data.getAverageLength());
+                OptionalLong nulls = fromMetastoreNullsCount(data.getNumberOfNulls());
+                return createBinaryColumnStatistics(
+                        max,
+                        getTotalSizeInBytes(avg, rowCount, nulls),
+                        nulls);
+            }
+            case BOOLEAN: {
+                BooleanColumnStatisticsData catalogBooleanData = catalogColumnStatisticsData.getBooleanColumnStatisticsData();
+                return createBooleanColumnStatistics(
+                        OptionalLong.of(catalogBooleanData.getNumberOfTrues()),
+                        OptionalLong.of(catalogBooleanData.getNumberOfFalses()),
+                        fromMetastoreNullsCount(catalogBooleanData.getNumberOfNulls()));
+            }
+            case DATE: {
+                DateColumnStatisticsData data = catalogColumnStatisticsData.getDateColumnStatisticsData();
+                Optional<LocalDate> min = Optional.empty();
+                Optional<LocalDate> max = Optional.empty();
+                OptionalLong nullsCount = fromMetastoreNullsCount(data.getNumberOfNulls());
+                OptionalLong distinctValues = OptionalLong.of(data.getNumberOfDistinctValues());
+                return createDateColumnStatistics(min, max, nullsCount, fromMetastoreDistinctValuesCount(distinctValues, nullsCount, rowCount));
+            }
+            case DECIMAL: {
+                DecimalColumnStatisticsData data = catalogColumnStatisticsData.getDecimalColumnStatisticsData();
+                Optional<BigDecimal> min = Optional.empty();
+                Optional<BigDecimal> max = Optional.empty();
+                OptionalLong distinctValues = OptionalLong.of(data.getNumberOfDistinctValues());
+                OptionalLong nullsCount = fromMetastoreNullsCount(data.getNumberOfNulls());
+                return createDecimalColumnStatistics(min, max, nullsCount, fromMetastoreDistinctValuesCount(distinctValues, nullsCount, rowCount));
+            }
+            case DOUBLE: {
+                DoubleColumnStatisticsData data = catalogColumnStatisticsData.getDoubleColumnStatisticsData();
+                OptionalDouble min = OptionalDouble.of(data.getMinimumValue());
+                OptionalDouble max = OptionalDouble.of(data.getMaximumValue());
+                OptionalLong nulls = fromMetastoreNullsCount(data.getNumberOfNulls());
+                OptionalLong distinctValues = OptionalLong.of(data.getNumberOfDistinctValues());
+                return createDoubleColumnStatistics(min, max, nulls, fromMetastoreDistinctValuesCount(distinctValues, nulls, rowCount));
+            }
+            case LONG: {
+                LongColumnStatisticsData data = catalogColumnStatisticsData.getLongColumnStatisticsData();
+                OptionalLong min = OptionalLong.of(data.getMinimumValue());
+                OptionalLong max = OptionalLong.of(data.getMaximumValue());
+                OptionalLong nullsCount = fromMetastoreNullsCount(data.getNumberOfNulls());
+                OptionalLong distinctValues = OptionalLong.of(data.getNumberOfDistinctValues());
+                return createIntegerColumnStatistics(min, max, nullsCount, fromMetastoreDistinctValuesCount(distinctValues, nullsCount, rowCount));
+            }
+            case STRING: {
+                StringColumnStatisticsData data = catalogColumnStatisticsData.getStringColumnStatisticsData();
+                OptionalLong max = OptionalLong.of(data.getMaximumLength());
+                OptionalDouble avg = OptionalDouble.of(data.getAverageLength());
+                OptionalLong nullsCount = fromMetastoreNullsCount(data.getNumberOfNulls());
+                OptionalLong distinctValues = OptionalLong.of(data.getNumberOfDistinctValues());
+                return createStringColumnStatistics(
+                        max,
+                        getTotalSizeInBytes(avg, rowCount, nullsCount),
+                        nullsCount,
+                        fromMetastoreDistinctValuesCount(distinctValues, nullsCount, rowCount));
+            }
+        }
+
+        throw new PrestoException(HIVE_METASTORE_ERROR, "Invalid column statistics data: " + catalogColumnStatisticsData);
+    }
+
+    private List<String> getAllColumns(Table table)
+    {
+        ImmutableList.Builder<String> allColumns = ImmutableList.builderWithExpectedSize(table.getDataColumns().size() + table.getPartitionColumns().size());
+        table.getDataColumns().stream().map(Column::getName).forEach(allColumns::add);
+        table.getPartitionColumns().stream().map(Column::getName).forEach(allColumns::add);
+        return allColumns.build();
     }
 
     @Override
