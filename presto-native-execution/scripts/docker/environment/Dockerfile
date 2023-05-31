@@ -19,6 +19,8 @@ RUN echo "fastestmirror=1" >> /etc/dnf/dnf.conf
 RUN dnf -y install openssh-clients git wget unzip make uuid hostname vim python3 perf && \
     python3 -m pip install six
 
+RUN git clone https://github.com/brendangregg/FlameGraph /opt/flamegraph
+
 WORKDIR /opt/dependency
 
 # Install Velox dependencies
