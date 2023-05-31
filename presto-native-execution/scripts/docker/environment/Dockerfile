@@ -16,7 +16,7 @@ SHELL ["/bin/bash", "-c"]
 
 RUN echo "fastestmirror=1" >> /etc/dnf/dnf.conf
 
-RUN dnf -y install openssh-clients git wget unzip make uuid hostname vim python3 && \
+RUN dnf -y install openssh-clients git wget unzip make uuid hostname vim python3 perf && \
     python3 -m pip install six
 
 WORKDIR /opt/dependency
