@@ -479,9 +479,10 @@ void PrestoServer::initializeVeloxMemory() {
   } else {
     allocator = memory::MemoryAllocator::createDefaultInstance();
   }
-  cache_ = std::make_shared<cache::AsyncDataCache>(
-      allocator, memoryBytes, std::move(ssd));
-  memory::MemoryAllocator::setDefaultInstance(cache_.get());
+  // cache_ = std::make_shared<cache::AsyncDataCache>(
+  //     allocator, memoryBytes, std::move(ssd));
+  // memory::MemoryAllocator::setDefaultInstance(cache_.get());
+  memory::MemoryAllocator::setDefaultInstance(allocator.get());
   // Set up velox memory manager.
   memory::MemoryManager::getInstance(
       memory::MemoryManager::Options{
