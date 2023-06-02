@@ -116,7 +116,7 @@ void enableChecksum() {
 
 PrestoServer::PrestoServer(const std::string& configDirectoryPath)
     : configDirectoryPath_(configDirectoryPath),
-      signalHandler_(std::make_unique<SignalHandler>(this)),
+      // signalHandler_(std::make_unique<SignalHandler>(this)),
       start_(std::chrono::steady_clock::now()),
       memoryInfo_(std::make_unique<protocol::MemoryInfo>()) {}
 
