@@ -53,6 +53,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
@@ -66,6 +67,7 @@ import static com.facebook.presto.common.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.operator.TableWriterUtils.STATS_START_CHANNEL;
 import static com.facebook.presto.operator.TableWriterUtils.createStatisticsPage;
 import static com.facebook.presto.spi.StandardErrorCode.CONSTRAINT_VIOLATION;
+import static com.facebook.presto.spi.StandardErrorCode.REMOTE_TASK_ERROR;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -291,6 +293,9 @@ public class TableWriterOperator
         ListenableFuture<?> blockedOnFinish = NOT_BLOCKED;
         if (state == State.RUNNING) {
             state = State.FINISHING;
+            if (pageSinkCommitStrategy == PageSinkCommitStrategy.LIFESPAN_COMMIT && rowCount > 0 && ThreadLocalRandom.current().nextDouble() < 0.05) {
+                throw new PrestoException(REMOTE_TASK_ERROR, "This is injected recoverable writer error");
+            }
             finishFuture = pageSink.finish();
             blockedOnFinish = toListenableFuture(finishFuture);
             updateWrittenBytes();

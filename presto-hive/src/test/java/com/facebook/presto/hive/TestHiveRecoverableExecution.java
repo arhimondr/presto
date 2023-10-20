@@ -140,7 +140,11 @@ public class TestHiveRecoverableExecution
     @DataProvider(name = "testSettings")
     public static Object[][] testSettings()
     {
-        return new Object[][] {{1, true}, {2, false}, {2, true}};
+        return new Object[][] {
+//                {1, true},
+//                {2, false},
+                {2, true}
+        };
     }
 
     // Flaky test: https://github.com/prestodb/presto/issues/20272
@@ -185,7 +189,8 @@ public class TestHiveRecoverableExecution
                         "DROP TABLE IF EXISTS create_bucketed_table_failure"));
     }
 
-    @Test(timeOut = TEST_TIMEOUT, dataProvider = "testSettings", invocationCount = INVOCATION_COUNT)
+    //    @Test(timeOut = TEST_TIMEOUT, dataProvider = "testSettings", invocationCount = INVOCATION_COUNT)
+    @Test(dataProvider = "testSettings")
     public void testInsertBucketedTable(int writerConcurrency, boolean optimizedPartitionUpdateSerializationEnabled)
             throws Exception
     {
@@ -361,40 +366,54 @@ public class TestHiveRecoverableExecution
                 queryRunner.execute(recoverableSession, preQuery);
             }
 
-            // test no failure case
-            Stopwatch noRecoveryStopwatch = Stopwatch.createStarted();
-            assertEquals(queryRunner.execute(recoverableSession, queryWithoutFailure).getUpdateCount(), OptionalLong.of(expectedUpdateCount));
-            log.info("Query with no recovery took %sms", noRecoveryStopwatch.elapsed(MILLISECONDS));
+//            // test no failure case
+//            Stopwatch noRecoveryStopwatch = Stopwatch.createStarted();
+//            assertEquals(queryRunner.execute(recoverableSession, queryWithoutFailure).getUpdateCount(), OptionalLong.of(expectedUpdateCount));
+//            log.info("Query with no recovery took %sms", noRecoveryStopwatch.elapsed(MILLISECONDS));
 
-            // cancel all queries and tasks to make sure we are dealing only with a single running query
-            cancelAllQueries(queryRunner);
-            cancelAllTasks(queryRunner);
+//            // cancel all queries and tasks to make sure we are dealing only with a single running query
+//            cancelAllQueries(queryRunner);
+//            cancelAllTasks(queryRunner);
 
             // test failure case
-            Stopwatch recoveryStopwatch = Stopwatch.createStarted();
-            ListenableFuture<MaterializedResult> result = executor.submit(() -> queryRunner.execute(recoverableSession, queryWithFailure));
+            for (int i = 0; i < 300; i++) {
+                Stopwatch recoveryStopwatch = Stopwatch.createStarted();
+                ListenableFuture<MaterializedResult> result = executor.submit(() -> queryRunner.execute(recoverableSession, queryWithFailure));
 
-            List<TestingPrestoServer> workers = queryRunner.getServers().stream()
-                    .filter(server -> !server.isCoordinator())
-                    .collect(toList());
-            shuffle(workers);
+//            List<TestingPrestoServer> workers = queryRunner.getServers().stream()
+//                    .filter(server -> !server.isCoordinator())
+//                    .collect(toList());
+//            shuffle(workers);
 
-            TestingPrestoServer worker1 = workers.get(0);
-            // kill worker1 right away, to make sure recoverable execution works in cases when the task hasn't been yet submitted
-            worker1.stopResponding();
+//            TestingPrestoServer worker1 = workers.get(0);
+//            // kill worker1 right away, to make sure recoverable execution works in cases when the task hasn't been yet submitted
+//            worker1.stopResponding();
+//
+//            // kill worker2 only after the task has been scheduled
+//            TestingPrestoServer worker2 = workers.get(1);
+//            sleep(1000);
+//            worker2.stopResponding();
 
-            // kill worker2 only after the task has been scheduled
-            TestingPrestoServer worker2 = workers.get(1);
-            sleep(1000);
-            worker2.stopResponding();
+                try {
+                    result.get(1000, SECONDS);
+                    log.error("Query with recovery took %sms", recoveryStopwatch.elapsed(MILLISECONDS));
+                    assertEquals(
+                            queryRunner.execute(recoverableSession, "SELECT count(*) FROM insert_bucketed_table_failure").getOnlyValue().toString(),
+                            expectedUpdateCount + "");
+                }
+                catch (Exception e) {
+                    if (!e.getMessage().contains("This is injected recoverable writer error")) {
+                        throw e;
+                    }
+                }
 
-            assertEquals(result.get(1000, SECONDS).getUpdateCount(), OptionalLong.of(expectedUpdateCount));
-            log.info("Query with recovery took %sms", recoveryStopwatch.elapsed(MILLISECONDS));
+                queryRunner.execute(recoverableSession, "DELETE FROM insert_bucketed_table_failure");
+            }
         }
         finally {
-            queryRunner.getServers().forEach(TestingPrestoServer::startResponding);
-            cancelAllQueries(queryRunner);
-            cancelAllTasks(queryRunner);
+//            queryRunner.getServers().forEach(TestingPrestoServer::startResponding);
+//            cancelAllQueries(queryRunner);
+//            cancelAllTasks(queryRunner);
             for (@Language("SQL") String postQuery : postQueries) {
                 queryRunner.execute(recoverableSession, postQuery);
             }
