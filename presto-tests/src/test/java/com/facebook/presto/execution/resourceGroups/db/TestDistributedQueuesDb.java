@@ -14,14 +14,17 @@
 package com.facebook.presto.execution.resourceGroups.db;
 
 import com.facebook.presto.execution.resourceGroups.ResourceGroupRuntimeInfo;
+import com.facebook.presto.plugin.blackhole.BlackHoleConnector;
+import com.facebook.presto.plugin.blackhole.BlackHolePlugin;
 import com.facebook.presto.resourceGroups.db.H2ResourceGroupsDao;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.resourceGroups.ResourceGroupId;
 import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.tests.DistributedQueryRunner;
 import com.google.common.collect.ImmutableMap;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.util.Map;
@@ -45,10 +48,10 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 @Test(singleThreaded = true)
 public class TestDistributedQueuesDb
 {
-    private static final String LONG_LASTING_QUERY = "SELECT COUNT(*) FROM lineitem";
+    private static final String LONG_LASTING_QUERY = "SELECT COUNT(*) FROM blackhole.default.dummy";
     private DistributedQueryRunner queryRunner;
 
-    @BeforeMethod
+    @BeforeClass
     public void setup()
             throws Exception
     {
@@ -61,13 +64,24 @@ public class TestDistributedQueuesDb
         coordinatorProperties.put("concurrency-threshold-to-enable-resource-group-refresh", "0");
 
         queryRunner = createQueryRunner(dbConfigUrl, dao, coordinatorProperties.build(), 2);
+        queryRunner.installPlugin(new BlackHolePlugin());
+        queryRunner.createCatalog("blackhole", "blackhole", ImmutableMap.of());
+        queryRunner.execute("CREATE TABLE blackhole.default.dummy (col BIGINT) WITH (split_count = 1, rows_per_page = 1, pages_per_split = 1, page_processing_delay = '10m')");
     }
 
-    @AfterMethod(alwaysRun = true)
+    @AfterClass(alwaysRun = true)
     public void tearDown()
     {
         closeQuietly(queryRunner);
         queryRunner = null;
+    }
+
+    @AfterMethod(alwaysRun = true)
+    public void cancelAllQueries()
+    {
+        if (queryRunner != null) {
+            queryRunner.cancelAllQueries();
+        }
     }
 
     @Test(timeOut = 60_000)
@@ -93,7 +107,8 @@ public class TestDistributedQueuesDb
             if (resourceGroupRuntimeInfo != null) {
                 globalRunningQueries = resourceGroupRuntimeInfo.getDescendantRunningQueries();
             }
-        } while (globalRunningQueries != 3);
+        }
+        while (globalRunningQueries != 3);
 
         QueryId fourthAdhocQuery = createQuery(queryRunner, 0, adhocSession(), LONG_LASTING_QUERY);
 
@@ -126,7 +141,8 @@ public class TestDistributedQueuesDb
             if (resourceGroupRuntimeInfo != null) {
                 globalRunningQueries = resourceGroupRuntimeInfo.getDescendantRunningQueries();
             }
-        } while (globalRunningQueries != 3);
+        }
+        while (globalRunningQueries != 3);
 
         QueryId firstDashboardQuery = createQuery(queryRunner, 0, dashboardSession(), LONG_LASTING_QUERY);
 
@@ -161,7 +177,8 @@ public class TestDistributedQueuesDb
                     globalRunningQueries += resourceGroupRuntimeInfo.getDescendantRunningQueries();
                 }
             }
-        } while (globalRunningQueries != 3);
+        }
+        while (globalRunningQueries != 3);
 
         QueryId firstDashboardQuery = createQuery(queryRunner, 0, dashboardSession(), LONG_LASTING_QUERY);
 
@@ -198,6 +215,7 @@ public class TestDistributedQueuesDb
                     globalQueriedQueries += resourceGroupRuntimeInfo.getDescendantQueuedQueries();
                 }
             }
-        } while (globalRunningQueries != 3 && globalQueriedQueries != 1);
+        }
+        while (globalRunningQueries != 3 && globalQueriedQueries != 1);
     }
 }

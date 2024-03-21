@@ -11,10 +11,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.plugin.blackhole;
+package com.facebook.presto.tests;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.common.QualifiedObjectName;
+import com.facebook.presto.plugin.blackhole.BlackHoleConnector;
 import com.facebook.presto.testing.MaterializedResult;
 import com.facebook.presto.testing.MaterializedRow;
 import com.facebook.presto.testing.QueryRunner;
@@ -31,13 +32,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static com.facebook.airlift.testing.Assertions.assertGreaterThan;
-import static com.facebook.presto.plugin.blackhole.BlackHoleConnector.FIELD_LENGTH_PROPERTY;
-import static com.facebook.presto.plugin.blackhole.BlackHoleConnector.PAGES_PER_SPLIT_PROPERTY;
-import static com.facebook.presto.plugin.blackhole.BlackHoleConnector.PAGE_PROCESSING_DELAY;
-import static com.facebook.presto.plugin.blackhole.BlackHoleConnector.ROWS_PER_PAGE_PROPERTY;
-import static com.facebook.presto.plugin.blackhole.BlackHoleConnector.SPLIT_COUNT_PROPERTY;
-import static com.facebook.presto.plugin.blackhole.BlackHoleQueryRunner.createQueryRunner;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
+import static com.facebook.presto.tests.BlackHoleQueryRunner.createQueryRunner;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -124,9 +120,9 @@ public class TestBlackHoleSmoke
 
         try {
             assertThatQueryReturnsValue(
-                    format("CREATE TABLE nation WITH ( %s = 3, %s = 1 ) as SELECT * FROM tpch.tiny.nation",
-                            ROWS_PER_PAGE_PROPERTY,
-                            SPLIT_COUNT_PROPERTY),
+                    String.format("CREATE TABLE nation WITH ( %s = 3, %s = 1 ) as SELECT * FROM tpch.tiny.nation",
+                            BlackHoleConnector.ROWS_PER_PAGE_PROPERTY,
+                            BlackHoleConnector.SPLIT_COUNT_PROPERTY),
                     25L,
                     session);
             fail("Expected exception to be thrown here!");
@@ -172,10 +168,10 @@ public class TestBlackHoleSmoke
                 .build();
 
         assertThatQueryReturnsValue(
-                format("CREATE TABLE nation WITH ( %s = 3, %s = 2, %s = 1 ) as SELECT * FROM tpch.tiny.nation",
-                        ROWS_PER_PAGE_PROPERTY,
-                        PAGES_PER_SPLIT_PROPERTY,
-                        SPLIT_COUNT_PROPERTY),
+                String.format("CREATE TABLE nation WITH ( %s = 3, %s = 2, %s = 1 ) as SELECT * FROM tpch.tiny.nation",
+                        BlackHoleConnector.ROWS_PER_PAGE_PROPERTY,
+                        BlackHoleConnector.PAGES_PER_SPLIT_PROPERTY,
+                        BlackHoleConnector.SPLIT_COUNT_PROPERTY),
                 25L,
                 session);
         assertThatQueryReturnsValue("SELECT count(*) FROM nation", 6L, session);
@@ -203,12 +199,12 @@ public class TestBlackHoleSmoke
                 .build();
 
         assertThatQueryReturnsValue(
-                format("CREATE TABLE nation WITH ( %s = 8, %s = 1, %s = 1, %s = 1 ) AS " +
+                String.format("CREATE TABLE nation WITH ( %s = 8, %s = 1, %s = 1, %s = 1 ) AS " +
                                 "SELECT nationkey, name, regionkey, comment, 'abc' short_varchar FROM tpch.tiny.nation",
-                        FIELD_LENGTH_PROPERTY,
-                        ROWS_PER_PAGE_PROPERTY,
-                        PAGES_PER_SPLIT_PROPERTY,
-                        SPLIT_COUNT_PROPERTY),
+                        BlackHoleConnector.FIELD_LENGTH_PROPERTY,
+                        BlackHoleConnector.ROWS_PER_PAGE_PROPERTY,
+                        BlackHoleConnector.PAGES_PER_SPLIT_PROPERTY,
+                        BlackHoleConnector.SPLIT_COUNT_PROPERTY),
                 25L,
                 session);
 
@@ -283,7 +279,7 @@ public class TestBlackHoleSmoke
     private void createBlackholeAllTypesTable()
     {
         assertThatQueryReturnsValue(
-                format("CREATE TABLE blackhole_all_types (" +
+                String.format("CREATE TABLE blackhole_all_types (" +
                                 "  _varchar VARCHAR(10)" +
                                 ", _bigint BIGINT" +
                                 ", _integer INTEGER" +
@@ -298,9 +294,9 @@ public class TestBlackHoleSmoke
                                 ", _decimal_short DECIMAL(3,2)" +
                                 ", _decimal_long DECIMAL(30,10)" +
                                 ") WITH ( %s = 1, %s = 1, %s = 1 ) ",
-                        ROWS_PER_PAGE_PROPERTY,
-                        PAGES_PER_SPLIT_PROPERTY,
-                        SPLIT_COUNT_PROPERTY),
+                        BlackHoleConnector.ROWS_PER_PAGE_PROPERTY,
+                        BlackHoleConnector.PAGES_PER_SPLIT_PROPERTY,
+                        BlackHoleConnector.SPLIT_COUNT_PROPERTY),
                 true);
     }
 
@@ -320,13 +316,13 @@ public class TestBlackHoleSmoke
         Duration pageProcessingDelay = new Duration(1, SECONDS);
 
         assertThatQueryReturnsValue(
-                format("CREATE TABLE nation WITH ( %s = 8, %s = 1, %s = 1, %s = 1, %s = '%s' ) AS " +
+                String.format("CREATE TABLE nation WITH ( %s = 8, %s = 1, %s = 1, %s = 1, %s = '%s' ) AS " +
                                 "SELECT * FROM tpch.tiny.nation",
-                        FIELD_LENGTH_PROPERTY,
-                        ROWS_PER_PAGE_PROPERTY,
-                        PAGES_PER_SPLIT_PROPERTY,
-                        SPLIT_COUNT_PROPERTY,
-                        PAGE_PROCESSING_DELAY,
+                        BlackHoleConnector.FIELD_LENGTH_PROPERTY,
+                        BlackHoleConnector.ROWS_PER_PAGE_PROPERTY,
+                        BlackHoleConnector.PAGES_PER_SPLIT_PROPERTY,
+                        BlackHoleConnector.SPLIT_COUNT_PROPERTY,
+                        BlackHoleConnector.PAGE_PROCESSING_DELAY,
                         pageProcessingDelay),
                 25L,
                 session);
