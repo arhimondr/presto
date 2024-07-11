@@ -315,6 +315,8 @@ public class FeaturesConfig
     private boolean useNewNanDefinition = true;
     private boolean warnOnPossibleNans;
 
+    private boolean forceSingleNode;
+
     public enum PartitioningPrecisionStrategy
     {
         // Let Presto decide when to repartition
@@ -3157,6 +3159,18 @@ public class FeaturesConfig
     public FeaturesConfig setWarnOnCommonNanPatterns(boolean warnOnPossibleNans)
     {
         this.warnOnPossibleNans = warnOnPossibleNans;
+        return this;
+    }
+
+    public boolean isForceSingleNode()
+    {
+        return forceSingleNode;
+    }
+
+    @Config("force-single-node")
+    public FeaturesConfig setForceSingleNode(boolean forceSingleNode)
+    {
+        this.forceSingleNode = forceSingleNode;
         return this;
     }
 }

@@ -64,7 +64,7 @@ public final class PlanChecker
                         new TypeValidator(),
                         new VerifyOnlyOneOutputNode(),
                         new VerifyNoFilteredAggregations(),
-                        new ValidateAggregationsWithDefaultValues(forceSingleNode),
+                        new ValidateAggregationsWithDefaultValues(featuresConfig.isForceSingleNode()),
                         new ValidateStreamingAggregations(),
                         new VerifyNoIntermediateFormExpression(),
                         new VerifyProjectionLocality(),

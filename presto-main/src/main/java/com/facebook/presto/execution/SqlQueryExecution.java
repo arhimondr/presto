@@ -49,6 +49,7 @@ import com.facebook.presto.spi.resourceGroups.ResourceGroupQueryLimits;
 import com.facebook.presto.split.CloseableSplitSourceProvider;
 import com.facebook.presto.split.SplitManager;
 import com.facebook.presto.sql.Optimizer;
+import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.CanonicalPlanWithInfo;
 import com.facebook.presto.sql.planner.InputExtractor;
@@ -140,6 +141,7 @@ public class SqlQueryExecution
     private final PlanCanonicalInfoProvider planCanonicalInfoProvider;
     private final QueryAnalysis queryAnalysis;
     private final AnalyzerContext analyzerContext;
+    private final FeaturesConfig featuresConfig;
 
     private SqlQueryExecution(
             QueryAnalyzer queryAnalyzer,
@@ -165,7 +167,8 @@ public class SqlQueryExecution
             CostCalculator costCalculator,
             PlanChecker planChecker,
             PartialResultQueryManager partialResultQueryManager,
-            PlanCanonicalInfoProvider planCanonicalInfoProvider)
+            PlanCanonicalInfoProvider planCanonicalInfoProvider,
+            FeaturesConfig featuresConfig)
     {
         try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
             this.queryAnalyzer = requireNonNull(queryAnalyzer, "queryAnalyzer is null");
@@ -190,6 +193,7 @@ public class SqlQueryExecution
             this.planChecker = requireNonNull(planChecker, "planChecker is null");
             this.planCanonicalInfoProvider = requireNonNull(planCanonicalInfoProvider, "planCanonicalInfoProvider is null");
             this.analyzerContext = getAnalyzerContext(queryAnalyzer, metadata.getMetadataResolver(stateMachine.getSession()), idAllocator, new VariableAllocator(), stateMachine.getSession());
+            this.featuresConfig = requireNonNull(featuresConfig, "featuresConfig is null");
 
             // analyze query
             requireNonNull(preparedQuery, "preparedQuery is null");
@@ -577,7 +581,7 @@ public class SqlQueryExecution
             variableAllocator.set(new VariableAllocator(plan.getTypes().allVariables()));
             SubPlan fragmentedPlan = getSession().getRuntimeStats().profileNanos(
                     FRAGMENT_PLAN_TIME_NANOS,
-                    () -> planFragmenter.createSubPlans(stateMachine.getSession(), plan, false, idAllocator, variableAllocator.get(), stateMachine.getWarningCollector()));
+                    () -> planFragmenter.createSubPlans(stateMachine.getSession(), plan, featuresConfig.isForceSingleNode(), idAllocator, variableAllocator.get(), stateMachine.getWarningCollector()));
 
             // record analysis time
             stateMachine.endAnalysis();
@@ -855,6 +859,7 @@ public class SqlQueryExecution
         private final PlanChecker planChecker;
         private final PartialResultQueryManager partialResultQueryManager;
         private final HistoryBasedPlanStatisticsManager historyBasedPlanStatisticsManager;
+        private final FeaturesConfig featuresConfig;
 
         @Inject
         SqlQueryExecutionFactory(
@@ -876,7 +881,8 @@ public class SqlQueryExecution
                 CostCalculator costCalculator,
                 PlanChecker planChecker,
                 PartialResultQueryManager partialResultQueryManager,
-                HistoryBasedPlanStatisticsManager historyBasedPlanStatisticsManager)
+                HistoryBasedPlanStatisticsManager historyBasedPlanStatisticsManager,
+                FeaturesConfig featuresConfig)
         {
             requireNonNull(config, "config is null");
             this.schedulerStats = requireNonNull(schedulerStats, "schedulerStats is null");
@@ -899,6 +905,7 @@ public class SqlQueryExecution
             this.planChecker = requireNonNull(planChecker, "planChecker is null");
             this.partialResultQueryManager = requireNonNull(partialResultQueryManager, "partialResultQueryManager is null");
             this.historyBasedPlanStatisticsManager = requireNonNull(historyBasedPlanStatisticsManager, "historyBasedPlanStatisticsManager is null");
+            this.featuresConfig = requireNonNull(featuresConfig, "featuresConfig is null");
         }
 
         @Override
@@ -939,7 +946,8 @@ public class SqlQueryExecution
                     costCalculator,
                     planChecker,
                     partialResultQueryManager,
-                    historyBasedPlanStatisticsManager.getPlanCanonicalInfoProvider());
+                    historyBasedPlanStatisticsManager.getPlanCanonicalInfoProvider(),
+                    featuresConfig);
         }
     }
 }

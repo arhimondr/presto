@@ -2915,7 +2915,8 @@ public final class SystemSessionProperties
 
     public static boolean preferMergeJoinForSortedInputs(Session session)
     {
-        return session.getSystemProperty(PREFER_MERGE_JOIN_FOR_SORTED_INPUTS, Boolean.class);
+        // TODO: merge join broken for single node execution
+        return false;
     }
 
     public static boolean isSegmentedAggregationEnabled(Session session)

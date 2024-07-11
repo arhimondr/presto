@@ -220,7 +220,7 @@ public class PlanOptimizers
     {
         this(metadata,
                 sqlParser,
-                false,
+                featuresConfig.isForceSingleNode(),
                 exporter,
                 splitManager,
                 planOptimizerManager,
